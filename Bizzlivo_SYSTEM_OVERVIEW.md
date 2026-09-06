@@ -455,26 +455,44 @@ Recent activity is assembled by querying several domain tables and normalizing t
 
 ## 16. Billing and plan enforcement
 
-Plan definitions are stored in `plan_limits`, making the database the source of truth for prices and limits.
+`plan_limits` (one row per plan) is the **single source of truth** for prices *and* entitlements. It is read by the Billing page (`fetchPlanLimits`), the `get_org_usage()` RPC, every enforcement trigger, and `generate-questions`. A price or entitlement change is one migration — no Paystack-side edit, because checkout is a one-off inline charge whose amount is derived from these rows.
 
-| Plan | Monthly | Yearly | Members | Resources | Published exams | AI generations/month | AI questions/month |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Free | ₦0 | ₦0 | 5 | 3 | 1 | 3 | 30 |
-| Growth | ₦5,000 | ₦50,000 | 20 | Unlimited | Unlimited | 10 | 150 |
-| Business | ₦12,000 | ₦120,000 | 50 | Unlimited | Unlimited | 25 | 250 |
+### Pricing (v2 — migration `0047`, digital-office positioning)
 
-Business enables custom branding; paid plans remove the public-link Bizzlivo badge according to stored plan flags.
+Bizzlivo is a digital business office, not an assessment product. Pricing meters the one thing that reflects office value — **team size** — and no longer meters "resources" or "published quizzes" (those limits and their triggers were dropped; the columns stay nullable for a future plan).
 
-New offices attempt to receive a 14-day Growth trial. Subscription status is reconciled on later authenticated loads through `sync_subscription_status()` rather than a scheduled job.
+| Plan | Monthly | Yearly (≈2 months free) | Members | Admin seats | Reports | AI gen/mo | AI q/mo | Badge removed | Custom branding |
+|---|---:|---:|---:|---:|---|---:|---:|:--:|:--:|
+| Free | ₦0 | ₦0 | 5 | 1 | Basic | 3 | 30 | — | — |
+| Growth | ₦15,000 | ₦150,000 | 25 | 2 | Full | 10 | 150 | ✓ | — |
+| Business | ₦35,000 | ₦350,000 | 100 | 5 | Advanced | 25 | 250 | ✓ | ✓ |
 
-Current Paystack checkout is a one-time payment for a selected cycle. It is not a true auto-renewing Paystack subscription. The user must pay again before the period ends. The webhook verifies signatures and records payment events; the verification function handles post-checkout confirmation.
+Kobo in DB: monthly `1_500_000` / `3_500_000`, yearly `15_000_000` / `35_000_000`.
 
-Limits are enforced in two places:
+### Entitlement layer
 
-- Frontend usage meters and preflight messages improve the user experience.
-- Database triggers enforce member, resource, and published-exam limits so direct API calls cannot bypass them.
+`src/lib/entitlements.ts` centralizes everything — `PLAN_META` (card copy), `COMPARE_ROWS` (comparison table, resolved from `plan_limits`), and helpers `seatState()`, `reportsLevel()` / `canUseReports()`, `hasEntitlement()`, `getPlanLimit()`, `subscriptionStatusLabel()`, money formatters. **Components must not branch on `plan === 'x'`** — they read `useOrgUsage()` and go through these.
 
-AI limits are checked and recorded by the question-generation Edge Function.
+Real, enforced entitlements:
+
+| Entitlement | Column | Enforcement |
+|---|---|---|
+| Member seats | `max_members` | `trg_enforce_member_limit` trigger (fires for service-role invite/join functions too) + `seatState` UX (80% "using N of M", 100% "limit reached" + disabled invite) on `/invites` and `/billing` |
+| Admin seats | `max_admins` (**new, 0047**) | `trg_enforce_admin_limit` trigger — blocks a membership *becoming* an active admin past the cap |
+| Reports level | `reports_level` `basic`/`full`/`advanced` (**new, 0047**) | `ReportsInsights`: `basic` = recent windows only (no `last_month`/`last_90_days`/`custom`); CSV export only on `advanced` |
+| Remove "Powered by Bizzlivo" | `removes_badge` | `OfficeLogin` (reads org `plan_tier` + public `plan_limits`) and `PublicTakeExam` (via `start-attempt` response) hide the badge |
+| Custom logo + brand colour | `custom_branding` | `OfficeSettings` gates the logo + brand-colour fields (upsell panel otherwise); `Layout` applies `brand_color` as the `--accent` / `--gold` override |
+| AI generation / question caps | `ai_*_per_month` | `generate-questions` Edge Function (rolling count over `ai_usage_events`) |
+
+### Subscription lifecycle
+
+New offices attempt a 14-day Growth trial (`start_trial`). Status is reconciled lazily on authenticated loads via `sync_subscription_status()` (no cron). Checkout is a **one-off Paystack inline charge** per cycle (not auto-renewing) — `verify-paystack-transaction` (instant) and `paystack-webhook` (durable, HMAC) both call the idempotent `activatePaidPlan()` in `_shared/paystack.ts`, which now **re-validates the charged amount against `plan_limits`** before granting access. Admin RPCs: `request_cancel_subscription` (cancel at period end), `resume_subscription` (**new, 0048** — clears the pending cancel), `downgrade_to_free_now` (immediate). All downgrades are soft — nothing already created is deleted, new usage is capped going forward.
+
+### Billing page
+
+`src/pages/billing/Billing.tsx` — header "Billing & Plan", a **Current plan** panel (name, org, seat limit, price, renew/status line, cancel/resume/downgrade), a separate **Current usage** panel (members · admin seats · AI generations · AI questions — no resource/quiz meters), a Monthly/Yearly toggle with a "Save 2 months" chip and per-plan yearly breakdown ("Equivalent to ₦X/month · save ₦Y/year"), three polished cards (Free / **Growth = Most popular** / Business), a **Compare plans** table, and billing history from `payment_events`. Responsive: cards go 3→1 at 900px with the current plan first, then Growth; the compare table scrolls inside its own container.
+
+**Existing subscribers:** none — prod has 0 `subscriptions` / 0 `payment_events` and Paystack is in test mode, so v2 prices took effect directly with no grandfathering.
 
 ## 17. Edge Functions
 
