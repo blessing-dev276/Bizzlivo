@@ -520,6 +520,10 @@ export default function Invites() {
               </div>
             </div>
 
+            <Link to={`/members/${drawerMember.profile.id}`} className="btn-primary-link" style={{ display: 'inline-block', marginBottom: 16 }}>
+              Open full member profile →
+            </Link>
+
             <label style={{ maxWidth: 200 }}>
               Role
               {canEditRoles ? (

@@ -4212,3 +4212,47 @@ td {
   .ac-item { flex-wrap: wrap; }
   .ac-cta { margin-left: 20px; }
 }
+
+/* ============================================================
+   Notification Center / Office Updates / Member 360 (phases 3–5)
+   ============================================================ */
+.notification-seeall { display: block; text-align: center; padding: 10px 4px 4px; font-size: 12.5px; color: var(--gold); text-decoration: none; border-top: 1px solid var(--line-soft); margin-top: 4px; }
+.notification-seeall:hover { text-decoration: underline; }
+
+.nc-list { display: flex; flex-direction: column; }
+.nc-row { display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--line-soft); padding: 13px 4px; cursor: pointer; }
+.nc-row:hover { background: var(--line-soft); filter: none; }
+.nc-row.unread .nc-text { color: var(--text-h); font-weight: 600; }
+.nc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.nc-text { font-size: 13px; color: var(--text-dim); }
+.nc-cat { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.nc-time { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+
+.ns-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; max-width: 560px; }
+.ns-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.ns-row:last-child { border-bottom: none; }
+.ns-row strong { display: block; font-size: 13.5px; color: var(--text-h); }
+.ns-help { font-size: 12px; color: var(--text-dim); }
+.ns-row input[type=checkbox] { width: 18px; height: 18px; }
+.ns-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+
+.ou-list { display: flex; flex-direction: column; gap: 12px; }
+.ou-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.ou-card.pinned { border-color: var(--gold); }
+.ou-card.high { box-shadow: inset 3px 0 0 var(--coral); }
+.ou-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.ou-pin { font-size: 11px; color: var(--gold); font-family: var(--font-mono); }
+.ou-flag { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--coral); border: 1px solid var(--coral); border-radius: 100px; padding: 2px 8px; }
+.ou-when { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+.ou-card h3 { margin: 0 0 6px; font-size: 15px; }
+.ou-body { font-size: 13px; color: var(--text-dim); white-space: pre-wrap; margin: 0 0 12px; }
+.ou-actions { display: flex; gap: 8px; align-items: center; }
+.ou-acked { font-size: 12px; color: var(--teal); }
+
+.m360-head { display: flex; align-items: center; gap: 16px; margin: 6px 0 18px; }
+.m360-head h1 { margin: 0 0 3px; }
+.m360-attn { list-style: none; margin: 0; padding: 0; }
+.m360-attn li { padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; color: var(--coral); }
+.m360-attn li:last-child { border-bottom: none; }
+.rp-metric-sub { min-height: 14px; }

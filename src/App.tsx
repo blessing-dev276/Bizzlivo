@@ -63,6 +63,10 @@ const RankPathBuilder = lazy(() => import('./pages/business-path/RankPathBuilder
 const MonthlyGoals = lazy(() => import('./pages/goals/MonthlyGoals'))
 const FreelanceWorkspace = lazy(() => import('./pages/freelance/FreelanceWorkspace'))
 const GoalsReview = lazy(() => import('./pages/goals/GoalsReview'))
+const NotificationCenter = lazy(() => import('./pages/notifications/NotificationCenter'))
+const OfficeUpdates = lazy(() => import('./pages/announcements/OfficeUpdates'))
+const AnnouncementsAdmin = lazy(() => import('./pages/announcements/AnnouncementsAdmin'))
+const MemberProfile360 = lazy(() => import('./pages/members/MemberProfile360'))
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 const FinanceWorkspace = lazy(() => import('./pages/finance/FinanceWorkspace'))
 
@@ -194,6 +198,10 @@ export default function App() {
           <Route path="/rank" element={<Navigate to="/business-path" replace />} />
           <Route path="/goals" element={<Protected><MonthlyGoals /></Protected>} />
           <Route path="/goals/review" element={<Protected><GoalsReview /></Protected>} />
+          <Route path="/notifications" element={<Protected><NotificationCenter /></Protected>} />
+          <Route path="/updates" element={<Protected><OfficeUpdates /></Protected>} />
+          <Route path="/office/announcements" element={<Protected><AnnouncementsAdmin /></Protected>} />
+          <Route path="/members/:userId" element={<Protected><MemberProfile360 /></Protected>} />
           <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
           <Route path="/finance" element={<Protected><FinanceWorkspace /></Protected>} />
 

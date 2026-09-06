@@ -3,10 +3,10 @@ import { useAuth } from '../../lib/AuthContext'
 import Billing from '../billing/Billing'
 import ProfileSettings from './ProfileSettings'
 import OfficeSettings from './OfficeSettings'
+import NotificationSettings from './NotificationSettings'
 
-// Profile is for everyone; Office and Billing are admin-only. Add more
-// <button>/section pairs here as they're built.
-type Section = 'profile' | 'office' | 'billing'
+// Profile + Notifications are for everyone; Office and Billing are admin-only.
+type Section = 'profile' | 'notifications' | 'office' | 'billing'
 
 const ADMIN_ROLES = new Set(['admin'])
 
@@ -25,6 +25,9 @@ export default function Settings() {
         <button type="button" className={section === 'profile' ? 'active' : ''} onClick={() => setSection('profile')}>
           Profile
         </button>
+        <button type="button" className={section === 'notifications' ? 'active' : ''} onClick={() => setSection('notifications')}>
+          Notifications
+        </button>
         {isAdmin && (
           <button type="button" className={section === 'office' ? 'active' : ''} onClick={() => setSection('office')}>
             Office
@@ -38,6 +41,7 @@ export default function Settings() {
       </div>
 
       {section === 'profile' && <ProfileSettings />}
+      {section === 'notifications' && <NotificationSettings />}
       {section === 'office' && isAdmin && <OfficeSettings />}
       {section === 'billing' && isAdmin && <Billing />}
     </div>

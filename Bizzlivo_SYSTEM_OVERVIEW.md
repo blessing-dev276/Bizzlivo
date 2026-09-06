@@ -464,11 +464,23 @@ The system has general leaderboard views based on attempts/performance. The newe
 - Top producer from won network-marketing contacts.
 - Most improved from passed exam attempts.
 
-## 15. Notifications and recent activity
+## 15. Notifications, announcements, and Member 360 (`0050`)
 
-Notifications are stored per user and organization. Members can read and mark their own notifications. The app generates notifications for relevant actions, including office join requests. The header bell displays unread state.
+### Notification Center
 
-Recent activity is assembled by querying several domain tables and normalizing their timestamps into one feed. It is a frontend aggregation rather than a dedicated event-stream architecture.
+`notifications` gains `category` (`action`/`business`/`goals`/`learning`/`finance`/`office`/`network`/`freelance`) and `dedupe_key` (partial-unique on `(user_id, dedupe_key)`). `notification_prefs` holds per-member toggles (goal_reminders / learning / finance / events / announcements), managed in Settings → Notifications. The **`notify(p_org, p_user, p_category, p_type, p_text, p_link, p_dedupe_key)` RPC** is the one safe way to create a notification: it checks the target is an active member, checks the relevant pref, and `on conflict do nothing` against the dedupe key. `/notifications` (`NotificationCenter.tsx`) is the full page with category tabs; the header bell now shows 12 and links to it.
+
+### Office Announcements
+
+`office_announcements` (title / body / `audience_type` `all`|`team`|`rank`|`members` + `audience_ids uuid[]` / `priority` / `link` / `related_event_id` / `publish_at` / `expires_at` / `pinned` / `requires_ack`) + `announcement_reads` (per-member read/ack). RLS: admins manage in their org; a member reads a published, unexpired announcement whose audience resolves to them (via `group_members` for team, `member_rank_progress.current_rank_id` for rank, `auth.uid() = any(audience_ids)` for members). An `AFTER INSERT` trigger fans out one `notify(..., 'office', ..., 'ann:<id>')` to the resolved audience. Admin CRUD at `/office/announcements`; members see `/updates` (`OfficeUpdates.tsx`) — pinned first, ack button when `requires_ack`.
+
+### Admin Member 360
+
+`report_member(p_org, p_user)` (0041/0042) is extended in 0050 with freelance counts, verified freelance earnings, `finance_member_balances`, team, membership status/role, goals-this-month, goal-changes-requested, and rank-start — and its guard is widened so a **team leader** can open a profile for a member of a group they lead. `/members/:userId` (`MemberProfile360.tsx`, admin + team_leader) has Overview / Business Path / Goals / Freelance tabs; `member360Attention()` derives the "needs attention" list (no goals this month, changes requested, overdue follow-ups, BP stalled ≥21 days at <50%). Linked from the member drawer in `/invites`.
+
+### Recent activity (unchanged)
+
+Recent activity is still assembled client-side by querying several domain tables and normalizing timestamps. A dedicated `activity_log` (Phase 7 of the connected-OS work) is not built yet.
 
 ## 16. Billing and plan enforcement
 

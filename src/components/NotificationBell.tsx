@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import type { Notification } from '../types/database'
@@ -90,7 +90,7 @@ export default function NotificationBell() {
             {items.length === 0 ? (
               <p className="empty-note" style={{ padding: '12px 4px' }}>Nothing here yet.</p>
             ) : (
-              items.map((n) => (
+              items.slice(0, 12).map((n) => (
                 <button
                   type="button"
                   key={n.id}
@@ -102,6 +102,9 @@ export default function NotificationBell() {
                 </button>
               ))
             )}
+            <Link to="/notifications" className="notification-seeall" onClick={() => setOpen(false)}>
+              Open Notification Center →
+            </Link>
           </div>
         </>
       )}
