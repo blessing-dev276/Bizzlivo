@@ -1,10 +1,10 @@
 import { useId } from 'react'
 
-// The Bizzlivo brand lockup — gradient "B" mark + wordmark (+ optional
-// tagline). One component so the logo lives in exactly one place: auth
-// screens, the marketing landing, the public exam page, and the collapsed
-// sidebar all render this. Colours track the app's blue→teal gradient
-// tokens; the wordmark inherits `currentColor` so it flips with the theme.
+// The Bizzlivo brand lockup — the gradient "B + bolt" mark + wordmark
+// (+ optional tagline). One component so the logo lives in exactly one
+// place: auth screens, the marketing landing, the public quiz page, and
+// the collapsed sidebar all render this. The mark matches the app icon /
+// favicon; the wordmark inherits `currentColor` so it flips with the theme.
 export default function BrandLogo({
   size = 26,
   tagline = false,
@@ -23,23 +23,31 @@ export default function BrandLogo({
       className="bl-mark"
       width={size}
       height={size}
-      viewBox="0 0 40 40"
+      viewBox="0 0 48 48"
       fill="none"
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={`${gid}g`} x1="4" y1="38" x2="34" y2="4" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#19c37d" />
-          <stop offset="0.5" stopColor="#17c3c9" />
-          <stop offset="1" stopColor="#2f6bf0" />
+        <linearGradient id={`${gid}b`} x1="10" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#2f6bf0" />
+          <stop offset="1" stopColor="#17c9c3" />
+        </linearGradient>
+        <linearGradient id={`${gid}z`} x1="8" y1="10" x2="28" y2="36" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#19d08a" />
+          <stop offset="1" stopColor="#14b9c0" />
         </linearGradient>
       </defs>
+      {/* B */}
       <path
+        fill={`url(#${gid}b)`}
         fillRule="evenodd"
         clipRule="evenodd"
-        fill={`url(#${gid}g)`}
-        d="M8 4h15c6.5 0 10 3.4 10 8.8 0 3.7-1.9 6.3-5.4 7.4 4.1.9 6.6 3.8 6.6 8.2C42.8 42 33.9 42 24 42H8V4Zm7 7v7h7c3.4 0 5.2-1.3 5.2-3.6C27.2 12.2 25.4 11 22 11h-7Zm0 13v6h8c3.6 0 5.4-1 5.4-3S28 24 24 24h-9Z"
-        transform="scale(0.9) translate(2 0)"
+        d="M10 5h15.5c6.9 0 10.7 3.6 10.7 9.2 0 3.9-2 6.6-5.7 7.7 4.3 1 6.9 4 6.9 8.6C43.3 44 33.9 44 23.5 44H10V5Zm7.4 7.3v7.4h7.4c3.6 0 5.5-1.4 5.5-3.8 0-2.5-1.9-3.6-5.5-3.6h-7.4Zm0 13.6v6.4h8.4c3.8 0 5.7-1.1 5.7-3.2 0-2.1-2-3.2-6-3.2h-8.1Z"
+      />
+      {/* bolt */}
+      <path
+        fill={`url(#${gid}z)`}
+        d="M12.5 11h16.8L16.9 23.6h10.4L12 38.5l5.6-15.1H8.7L12.5 11Z"
       />
     </svg>
   )

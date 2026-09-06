@@ -93,6 +93,7 @@ const I = {
   learning: <svg className="nav-ico" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>,
   members: <svg className="nav-ico" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   profile: <svg className="nav-ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+  freelance: <svg className="nav-ico" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>,
   teamPerf: <svg className="nav-ico" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>,
   myTeam: <svg className="nav-ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.6" /><circle cx="5" cy="19" r="2.6" /><circle cx="19" cy="19" r="2.6" /><path d="M12 7.6v4M12 11.6 6.6 17M12 11.6 17.4 17" /></svg>,
   exams: <svg className="nav-ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 15l2 2 4-4" /></svg>,
@@ -285,6 +286,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="sidebar-sec">
         <span className="sidebar-sec-label">Build</span>
         <NavItem to="/my-team" icon={I.network} label="My Network" onNavigate={closeMenu} />
+        <NavItem to="/freelance" icon={I.freelance} label="Freelance" onNavigate={closeMenu} />
         <NavItem to="/leaderboard" icon={I.leaderboard} label="Leaderboard" onNavigate={closeMenu} />
         <NavItem to="/wallet" icon={I.wallet} label="My Wallet" onNavigate={closeMenu} />
       </div>
@@ -335,6 +337,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         ) : (
           <NavItem to="/my-team" icon={I.network} label="My Network" onNavigate={closeMenu} />
         )}
+        <NavItem to="/freelance" icon={I.freelance} label="Freelance" onNavigate={closeMenu} />
         <NavItem to="/goals" icon={I.goals} label="My Goals" onNavigate={closeMenu} />
         <NavItem to="/wallet" icon={I.wallet} label="My Wallet" onNavigate={closeMenu} />
       </div>

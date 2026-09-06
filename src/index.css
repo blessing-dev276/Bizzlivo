@@ -4157,3 +4157,58 @@ td {
   font-size: 10px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--text-faint);
 }
+
+/* ============================================================
+   Freelance Workspace (/freelance)
+   ============================================================ */
+.fw-page { max-width: 1000px; }
+.fw-head { margin-bottom: 14px; }
+.fw-head h1 { margin: 0 0 3px; }
+.fw-head p { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+.fw-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px; }
+.fw-metric { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px;
+  text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color .15s; }
+.fw-metric:hover { border-color: var(--gold); filter: none; }
+.fw-m-v { font-family: var(--font-display); font-size: 21px; font-weight: 700; color: var(--text-h); }
+.fw-m-l { font-family: var(--font-mono); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); }
+.fw-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.fw-row { cursor: pointer; }
+.fw-row:hover td { background: var(--line-soft); }
+.fw-attn { display: flex; flex-direction: column; gap: 2px; }
+.fw-attn-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.fw-attn-row:last-child { border-bottom: none; }
+.fw-attn-n { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-h); min-width: 30px; }
+.fw-attn-n.bad { color: var(--coral); }
+.fw-attn-t { flex: 1; font-size: 13px; color: var(--text-dim); }
+@media (max-width: 820px) { .fw-metrics { grid-template-columns: repeat(2, 1fr); } }
+
+/* ============================================================
+   Member dashboard — Today's Focus / Action Center
+   ============================================================ */
+.ac-card { margin-bottom: 18px; }
+.ac-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+.ac-count-crit { color: var(--coral); }
+.ac-clear { padding: 6px 0; }
+.ac-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ac-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.ac-item:last-child { border-bottom: none; }
+.ac-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--text-faint); }
+.ac-dot.critical { background: var(--coral); box-shadow: 0 0 0 4px color-mix(in srgb, var(--coral) 18%, transparent); }
+.ac-dot.high { background: var(--gold); }
+.ac-dot.normal { background: var(--teal); }
+.ac-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ac-title { font-size: 13.5px; font-weight: 600; color: var(--text-h); }
+.ac-meta { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-cta {
+  flex-shrink: 0; background: var(--line-soft); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer;
+}
+.ac-cta:hover { border-color: var(--gold); color: var(--gold); filter: none; }
+.ac-item.critical .ac-cta { background: var(--coral-soft); border-color: var(--coral); color: var(--coral); }
+.ac-more { background: none; border: none; color: var(--gold); font-size: 12.5px; cursor: pointer; padding: 10px 0 0; }
+.ac-more:hover { text-decoration: underline; filter: none; }
+.ac-sk { height: 44px; border-radius: 8px; background: var(--line-soft); margin: 8px 0; animation: rp-pulse 1.4s ease-in-out infinite; }
+@media (max-width: 640px) {
+  .ac-item { flex-wrap: wrap; }
+  .ac-cta { margin-left: 20px; }
+}

@@ -14,6 +14,7 @@ import {
   type PathState,
 } from '../../lib/businessPath'
 import RecentActivity from '../../components/RecentActivity'
+import TodayActionCenter from './TodayActionCenter'
 import { DashboardSkeleton } from '../../components/AppSkeleton'
 import { timeOfDayGreeting } from './dashboardShared'
 import { loadMemberBalances, moneyList } from '../../lib/finance'
@@ -336,6 +337,8 @@ export default function MemberHome() {
       {path.awaitingApproval && !path.readyForPromotion && (
         <div className="mrk-banner wait"><span>One or more requirements are awaiting staff approval.</span></div>
       )}
+
+      <TodayActionCenter orgId={orgId!} userId={userId!} path={path} />
 
       <div className="dash-grid">
         {/* ---- current rank summary + requirements ---- */}

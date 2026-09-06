@@ -188,6 +188,8 @@ The office-wide dashboard loads membership, invite, exam, publication, resource,
 
 Migrations `0034`–`0040` are all applied to the linked production database.
 
+**Today's Focus / Action Center.** A full-width `src/pages/dashboard/TodayActionCenter.tsx` panel sits above the dashboard grid and answers "what should I do today?". `src/lib/actionCenter.ts` `loadActions(orgId, userId, path)` builds one prioritized `Action[]` — `{ id, category (goals|business_path|network|freelance|finance), priority (critical|high|normal), title, description?, ctaLabel, ctaRoute }` — derived live from source systems, nothing stored: missing monthly goals / goal changes-requested / goals ready to submit; Business Path items in `changes_requested`/`rejected`, approval-mode promotion ready, next required item; overdue network prospect follow-ups; freelance overdue projects + follow-ups due; available wallet balance. Sorted critical → high → normal; shows 5 with "+N more". No table — client-only.
+
 ### 7.3 Navigation
 
 Members see grouped navigation: Dashboard, Onboarding/Training, **Business Path**, Goals, Reports, Network, Leaderboard, Wallet. (The old separate "Tasks" and "Rank Journey" items are folded into Business Path.)
@@ -367,6 +369,21 @@ Admins can create invite links, approve/reject pending members, edit roles, crea
 - **Network** — an interactive sponsorship diagram. `src/lib/network.ts` builds the tree client-side from **four bulk reads** (`memberships`, `profiles`, `member_rank_progress`, `business_path_ranks`) — no per-node queries, no RPC, no service role. Hierarchy follows `profiles.sponsor_member_id` only. `src/pages/teams/NetworkTree.tsx` renders a custom pan / zoom / pinch SVG-connector canvas with collapsible branches, lazy rendering of collapsed subtrees, search-to-centre, fit view, and a node detail drawer. Members whose membership is no longer `active` show as muted "removed" nodes and are excluded from all summary counts.
 
 Sponsorship itself is still `profiles.sponsor_member_id` (self-FK, 0019), set either manually in Profile Settings or automatically by the `join-by-referral` edge function when someone joins through a member's referral link. `0037` adds `profiles.referral_code` (stable, unique, url-safe) and the prospect scheduling columns `source`, `next_follow_up_at`, `last_contacted_at`, `linked_member_id` plus one widened policy: `member_rank_progress` SELECT, staff-only since 0035, is opened to any active org member (reads only — writes still go through `promote_member()` / admins) so downline rank labels render for member viewers. Members already manage their own contact rows, so the new contact columns need no policy change.
+
+### 12.2 Freelance Workspace (`/freelance` — `0049_freelance.sql`)
+
+The freelancing counterpart of My Network — the member-facing CRM for the freelancing side of the business. `?view=`-synced tabs:
+
+- **Overview** — metric row (active prospects / clients / open projects / completed this month / verified earnings), a "Needs Attention" panel (prospect & project follow-ups due, overdue projects, proposals out), and a recent-activity feed from `freelance_activities`.
+- **Prospects** — potential freelance clients: `name`, `company`, `platform` (free text; UI suggests Fiverr / Upwork / Contra / LinkedIn / Instagram / Direct / Referral / Other), `service`, `contact_link`, `status` (`lead → contacted → replied → negotiating → proposal_sent → won → lost`), `expected_value`/`currency`, `next_follow_up_at`, `last_contacted_at`, `source`. Detail drawer: status, follow-up, log-contact, add-note, **Convert to client**.
+- **Clients** — `freelance_clients` (name, company, platform, contact, `services text[]`, notes) with each client's projects and rolled-up verified earnings.
+- **Projects** — `freelance_projects`: `title`, `client_id`, `service`, `platform`, `order_value`/`currency`, `start_date`/`due_date`, `status` (`new → in_progress → delivered → revision → completed → cancelled`), `next_follow_up_at`, `completed_at`.
+
+**Finance integration (link, don't duplicate):** `freelance_projects.finance_order_id` is an optional FK to an admin-verified `finance_orders` row (0043). Nothing here creates withdrawable funds — `finance_record_order` (admin-only) remains the single path. A member's "Mark completed & notify office" sets the project `completed` and drops a `freelance_order_ready` notification to org admins; the admin records/links the Finance order in the Finance workspace (that linking UI is a later phase). "Verified earnings" = sum of `order_value` for projects that have a `finance_order_id`.
+
+**Tables & RLS:** `freelance_clients`, `freelance_prospects`, `freelance_projects`, `freelance_activities` — each with `member manages own` / `admin reads org` / `team_leader reads their team's members` policies (same shape as goals v2). `src/lib/freelance/index.ts` is the domain layer; `src/pages/freelance/FreelanceWorkspace.tsx` the UI. `runFreelanceMaintenance()` drops one deduped "N freelance follow-ups due" notification per member per day (a proper `dedupe_key` RPC replaces this in the Notification Center phase).
+
+**Deferred (later phases of the connected-OS work):** Action Center, Notification Center + preferences, Office Announcements, Admin Member 360, Office setup wizard, Office Activity/Pulse, Global Search (Cmd+K), Bizzlivo Super Admin, Help & Support, and the admin-side Finance↔project linking UI.
 
 ## 13. Events
 
