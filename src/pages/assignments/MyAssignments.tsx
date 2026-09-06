@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageSkeleton } from '../../components/AppSkeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
@@ -67,7 +68,7 @@ export default function MyAssignments() {
     }
   }, [profile, orgId])
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
 
   return (
     <div className="page">

@@ -170,7 +170,7 @@ export default function TeamDetail() {
 
   async function deleteTeam() {
     if (!team) return
-    if (!confirm(`Delete "${team.name}" permanently? This removes the team and its member list — it doesn't touch anyone's exam or assignment history.`)) return
+    if (!confirm(`Delete "${team.name}" permanently? This removes the team and its member list — it doesn't touch anyone's quiz or assignment history.`)) return
     setBusy(true)
     const { error: deleteError } = await supabase.from('groups').delete().eq('id', team.id)
     setBusy(false)
@@ -178,7 +178,7 @@ export default function TeamDetail() {
       setError(deleteError.message)
       return
     }
-    navigate('/team-performance')
+    navigate('/team')
   }
 
   if (!canManage) {
@@ -194,7 +194,7 @@ export default function TeamDetail() {
     return (
       <div className="page">
         <h1>Team not found</h1>
-        <Link to="/team-performance">← Back to Team Performance</Link>
+        <Link to="/team">← Back to Team</Link>
       </div>
     )
   }
@@ -207,7 +207,7 @@ export default function TeamDetail() {
 
   return (
     <div className="page">
-      <Link to="/team-performance" style={{ fontSize: 13.5 }}>← Back to Team Performance</Link>
+      <Link to="/team" style={{ fontSize: 13.5 }}>← Back to Team</Link>
       <div className="page-head list-header" style={{ marginTop: 10, marginBottom: 0 }}>
         <h1 style={{ margin: 0 }}>{loading ? 'Loading…' : team?.name}</h1>
         {!loading && (
@@ -287,7 +287,7 @@ export default function TeamDetail() {
               <tr>
                 <th>Name</th>
                 <th>Email</th>
-                <th>Exams Completed</th>
+                <th>Quizzes Completed</th>
                 <th>Last Activity</th>
                 <th></th>
               </tr>

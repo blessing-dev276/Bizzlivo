@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { PageSkeleton } from '../../../components/AppSkeleton'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/AuthContext'
@@ -30,11 +31,15 @@ function initials(name: string) {
 const TYPE_LABEL: Record<ClassModuleItemType, string> = {
   video: 'Video',
   pdf: 'PDF',
+  podcast: 'Podcast',
+  link: 'Link',
   article: 'Article',
-  test: 'Test',
+  test: 'Quiz',
   quiz: 'Quiz',
   assignment: 'Assignment',
 }
+// Types offered in the "add item" picker (test/quiz are the same thing).
+const ITEM_TYPES: ClassModuleItemType[] = ['video', 'pdf', 'podcast', 'link', 'article', 'quiz', 'assignment']
 
 const TYPE_ICON: Partial<Record<ClassModuleItemType, React.ReactNode>> = {
   video: KIND_ICON.video,
@@ -45,6 +50,7 @@ interface ItemForm {
   type: ClassModuleItemType
   title: string
   resourceId: string
+  linkUrl: string
   body: string
   examId: string
   instructions: string
@@ -58,6 +64,7 @@ const BLANK_ITEM_FORM: ItemForm = {
   type: 'video',
   title: '',
   resourceId: '',
+  linkUrl: '',
   body: '',
   examId: '',
   instructions: '',
@@ -151,7 +158,12 @@ export default function ClassEditor() {
   // Development classes (which share this same editor, see
   // 0029_class_purpose.sql) get 'freelancing' ones. Personal Development's
   // 'book' resources never show here either way.
-  const resourcePurpose = classInfo?.purpose === 'income_development' ? 'freelancing' : 'skill_set'
+  const resourcePurpose =
+    classInfo?.area === 'personal_development'
+      ? 'book'
+      : classInfo?.area === 'income_development' || classInfo?.purpose === 'income_development'
+        ? 'freelancing'
+        : 'skill_set'
 
   useEffect(() => {
     if (!orgId || !classInfo) return
@@ -196,7 +208,7 @@ export default function ClassEditor() {
     return map
   }, [items])
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
   if (!classInfo) return <div className="page"><p>Class not found.</p></div>
 
   function startEditingInfo() {
@@ -376,7 +388,7 @@ export default function ClassEditor() {
 
   async function uploadNewResource() {
     if (!orgId || !profile) return
-    const type = itemForm.type as 'pdf' | 'video'
+    const type = itemForm.type as 'pdf' | 'video' | 'podcast'
     setResourceUploadError(null)
     if (!newResourceTitle.trim()) {
       setResourceUploadError('Give it a title.')
@@ -386,8 +398,8 @@ export default function ClassEditor() {
       setResourceUploadError('Choose a PDF file.')
       return
     }
-    if (type === 'video' && !newResourceLink.trim()) {
-      setResourceUploadError('Enter a video link.')
+    if (type !== 'pdf' && !newResourceLink.trim()) {
+      setResourceUploadError(`Enter a ${type} link.`)
       return
     }
     setResourceUploading(true)
@@ -399,7 +411,7 @@ export default function ClassEditor() {
         kind: type,
         purpose: resourcePurpose,
         file: type === 'pdf' ? newResourceFile : null,
-        linkUrl: type === 'video' ? newResourceLink : null,
+        linkUrl: type === 'pdf' ? null : newResourceLink,
       })
       setResources((prev) => [...prev, resource].sort((a, b) => a.title.localeCompare(b.title)))
       setItemForm((f) => ({ ...f, resourceId: resource.id }))
@@ -428,9 +440,13 @@ export default function ClassEditor() {
     setBusy(true)
     setError(null)
     try {
-      if (itemForm.type === 'video' || itemForm.type === 'pdf') {
+      if (itemForm.type === 'video' || itemForm.type === 'pdf' || itemForm.type === 'podcast') {
         if (!itemForm.resourceId) throw new Error(`Pick a ${TYPE_LABEL[itemForm.type].toLowerCase()} from your resource library.`)
         const { error: insertError } = await supabase.from('class_module_items').insert({ ...base, resource_id: itemForm.resourceId })
+        if (insertError) throw insertError
+      } else if (itemForm.type === 'link') {
+        if (!itemForm.linkUrl.trim()) throw new Error('Enter a URL.')
+        const { error: insertError } = await supabase.from('class_module_items').insert({ ...base, link_url: itemForm.linkUrl.trim() })
         if (insertError) throw insertError
       } else if (itemForm.type === 'article') {
         if (!itemForm.body.trim()) throw new Error('Write the article content.')
@@ -680,7 +696,7 @@ export default function ClassEditor() {
                     resetNewResourceForm()
                   }}
                 >
-                  {(Object.keys(TYPE_LABEL) as ClassModuleItemType[]).map((t) => (
+                  {ITEM_TYPES.map((t) => (
                     <option key={t} value={t}>{TYPE_LABEL[t]}</option>
                   ))}
                 </select>
@@ -690,7 +706,20 @@ export default function ClassEditor() {
                 <input value={itemForm.title} onChange={(e) => setItemForm((f) => ({ ...f, title: e.target.value }))} required autoFocus />
               </label>
 
-              {(itemForm.type === 'video' || itemForm.type === 'pdf') && (
+              {itemForm.type === 'link' && (
+                <label>
+                  URL
+                  <input
+                    type="url"
+                    value={itemForm.linkUrl}
+                    onChange={(e) => setItemForm((f) => ({ ...f, linkUrl: e.target.value }))}
+                    placeholder="https://…"
+                    required
+                  />
+                </label>
+              )}
+
+              {(itemForm.type === 'video' || itemForm.type === 'pdf' || itemForm.type === 'podcast') && (
                 <>
                   <label>
                     {TYPE_LABEL[itemForm.type]} from your resource library
@@ -704,7 +733,7 @@ export default function ClassEditor() {
 
                   {!showNewResource ? (
                     <button type="button" className="secondary" onClick={() => setShowNewResource(true)}>
-                      + Add new {itemForm.type === 'pdf' ? 'PDF' : 'video'}
+                      + Add new {TYPE_LABEL[itemForm.type]}
                     </button>
                   ) : (
                     <div className="res-card">
@@ -739,12 +768,12 @@ export default function ClassEditor() {
                         </label>
                       ) : (
                         <label>
-                          Video link
+                          {TYPE_LABEL[itemForm.type]} link
                           <input
                             type="url"
                             value={newResourceLink}
                             onChange={(e) => setNewResourceLink(e.target.value)}
-                            placeholder="https://youtube.com/…"
+                            placeholder="https://…"
                           />
                         </label>
                       )}
@@ -778,7 +807,7 @@ export default function ClassEditor() {
                   </select>
                   {exams.length === 0 && (
                     <p style={{ fontSize: 12.5, color: 'var(--text-faint)' }}>
-                      No published exams yet. <Link to="/exams">Create and publish one →</Link>, then come back.
+                      No published quizzes yet. <Link to="/quizzes">Create and publish one →</Link>, then come back.
                     </p>
                   )}
                 </label>

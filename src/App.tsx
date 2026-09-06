@@ -1,64 +1,86 @@
-import { useEffect, type ReactNode } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { getOfficeSlugFromHost } from './lib/tenant'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
+import AppSkeleton, { PageSkeleton } from './components/AppSkeleton'
 
-import Signup from './pages/auth/Signup'
+// Public entry points stay eager — no skeleton flash on first paint.
 import Login from './pages/auth/Login'
 import OfficeLogin from './pages/auth/OfficeLogin'
-import Onboarding from './pages/onboarding/Onboarding'
-import Dashboard from './pages/Dashboard'
 
-import Exams from './pages/exams/Exams'
-import ExamDetail from './pages/exams/ExamDetail'
-import GenerateQuestions from './pages/exams/GenerateQuestions'
-import ReviewQuestions from './pages/exams/review/ReviewQuestions'
-import ExamSettingsPage from './pages/exams/ExamSettings'
+// Every routed page is code-split: the initial bundle is just the shell,
+// and each page (plus its libs) downloads on first visit. Route changes show
+// a shimmer via the <Suspense> boundaries below.
+const Signup = lazy(() => import('./pages/auth/Signup'))
+const Landing = lazy(() => import('./pages/marketing/Landing'))
+const Onboarding = lazy(() => import('./pages/onboarding/Onboarding'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 
-import Billing from './pages/billing/Billing'
-import Settings from './pages/settings/Settings'
+const Exams = lazy(() => import('./pages/quizzes/Exams'))
+const ExamDetail = lazy(() => import('./pages/quizzes/ExamDetail'))
+const GenerateQuestions = lazy(() => import('./pages/quizzes/GenerateQuestions'))
+const ReviewQuestions = lazy(() => import('./pages/quizzes/review/ReviewQuestions'))
+const ExamSettingsPage = lazy(() => import('./pages/quizzes/ExamSettings'))
+const ExamAnalytics = lazy(() => import('./pages/quizzes/ExamAnalytics'))
+const AttemptDetail = lazy(() => import('./pages/quizzes/AttemptDetail'))
+const ExamRoster = lazy(() => import('./pages/quizzes/ExamRoster'))
 
-import Invites from './pages/invites/Invites'
-import AcceptInvite from './pages/invites/AcceptInvite'
-import Assign from './pages/invites/Assign'
+const Billing = lazy(() => import('./pages/billing/Billing'))
+const Settings = lazy(() => import('./pages/settings/Settings'))
 
-import MyExams from './pages/cbt/MyExams'
-import TakeExam from './pages/cbt/TakeExam'
-import Result from './pages/cbt/Result'
-import PublicTakeExam from './pages/cbt/PublicTakeExam'
-import ExamAnalytics from './pages/exams/ExamAnalytics'
-import AttemptDetail from './pages/exams/AttemptDetail'
-import ExamRoster from './pages/exams/ExamRoster'
+const Invites = lazy(() => import('./pages/invites/Invites'))
+const AcceptInvite = lazy(() => import('./pages/invites/AcceptInvite'))
+const JoinByReferral = lazy(() => import('./pages/join/JoinByReferral'))
+const Assign = lazy(() => import('./pages/invites/Assign'))
 
-import TrainingAnalytics from './pages/reports/TrainingAnalytics'
-import QuickReports from './pages/reports/QuickReports'
-import Training from './pages/growth/Training'
-import ClassDetail from './pages/growth/skill-development/ClassDetail'
-import TeamPerformance from './pages/teams/TeamPerformance'
-import TeamDetail from './pages/teams/TeamDetail'
-import MyTeam from './pages/teams/MyTeam'
+const MyExams = lazy(() => import('./pages/my-quizzes/MyExams'))
+const TakeExam = lazy(() => import('./pages/my-quizzes/TakeExam'))
+const Result = lazy(() => import('./pages/my-quizzes/Result'))
+const PublicTakeExam = lazy(() => import('./pages/my-quizzes/PublicTakeExam'))
 
-import Events from './pages/events/Events'
-import EventForm from './pages/events/EventForm'
-import EventDetail from './pages/events/EventDetail'
-import Leaderboard from './pages/leaderboard/Leaderboard'
+const ReportsInsights = lazy(() => import('./pages/reports/ReportsInsights'))
+const Training = lazy(() => import('./pages/growth/Training'))
+const ClassDetail = lazy(() => import('./pages/growth/skill-development/ClassDetail'))
+const TeamPerformance = lazy(() => import('./pages/teams/TeamPerformance'))
+const TeamDetail = lazy(() => import('./pages/teams/TeamDetail'))
+const MyTeam = lazy(() => import('./pages/teams/MyTeam'))
 
-import Assignments from './pages/assignments/Assignments'
-import NewAssignment from './pages/assignments/NewAssignment'
-import AssignmentDetail from './pages/assignments/AssignmentDetail'
-import MyAssignments from './pages/assignments/MyAssignments'
-import SubmitAssignment from './pages/assignments/SubmitAssignment'
+const Events = lazy(() => import('./pages/events/Events'))
+const EventForm = lazy(() => import('./pages/events/EventForm'))
+const EventDetail = lazy(() => import('./pages/events/EventDetail'))
+const Leaderboard = lazy(() => import('./pages/leaderboard/Leaderboard'))
 
-import TasksHub from './pages/tasks/TasksHub'
+const Assignments = lazy(() => import('./pages/assignments/Assignments'))
+const NewAssignment = lazy(() => import('./pages/assignments/NewAssignment'))
+const AssignmentDetail = lazy(() => import('./pages/assignments/AssignmentDetail'))
+const MyAssignments = lazy(() => import('./pages/assignments/MyAssignments'))
+const SubmitAssignment = lazy(() => import('./pages/assignments/SubmitAssignment'))
+
+const BusinessPathHub = lazy(() => import('./pages/business-path/BusinessPathHub'))
+const RankPathBuilder = lazy(() => import('./pages/business-path/RankPathBuilder'))
+const MonthlyGoals = lazy(() => import('./pages/goals/MonthlyGoals'))
+const GoalsReview = lazy(() => import('./pages/goals/GoalsReview'))
+const Wallet = lazy(() => import('./pages/wallet/Wallet'))
+const FinanceWorkspace = lazy(() => import('./pages/finance/FinanceWorkspace'))
 
 function Protected({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
-      <Layout>{children}</Layout>
+      <Layout>
+        <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+      </Layout>
     </ProtectedRoute>
   )
+}
+
+// Old /exams and /cbt links (bookmarks, notifications) still work — swap the
+// prefix and keep the rest of the path + query.
+function LegacyRedirect({ from, to }: { from: string; to: string }) {
+  const loc = useLocation()
+  const rest = loc.pathname.startsWith(from) ? loc.pathname.slice(from.length) : ''
+  return <Navigate to={`${to}${rest}${loc.search}`} replace />
 }
 
 // Reached at the root of an office's own subdomain (blaze-office.hq360.space),
@@ -78,7 +100,7 @@ function OfficeAwareRoot({ slug }: { slug: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.org_id])
 
-  if (loading) return <div className="page-loading">Loading…</div>
+  if (loading) return <AppSkeleton />
   if (!session) return <OfficeLogin slugOverride={slug} />
 
   if (!match) {
@@ -104,8 +126,29 @@ function OfficeAwareRoot({ slug }: { slug: string }) {
 
   return (
     <Layout>
-      <Dashboard />
+      <Suspense fallback={<PageSkeleton />}>
+        <Dashboard />
+      </Suspense>
     </Layout>
+  )
+}
+
+// Root of the main domain. Logged-out visitors get the marketing landing
+// page; a signed-in user goes straight to their dashboard.
+function RootGate() {
+  const { session, loading } = useAuth()
+  if (loading) return <AppSkeleton />
+  if (!session) {
+    return (
+      <Suspense fallback={<AppSkeleton />}>
+        <Landing />
+      </Suspense>
+    )
+  }
+  return (
+    <Protected>
+      <Dashboard />
+    </Protected>
   )
 }
 
@@ -114,61 +157,77 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/o/:slug/login" element={<OfficeLogin />} />
-        <Route path="/invite/:token" element={<AcceptInvite />} />
-        <Route path="/take/:token" element={<PublicTakeExam />} />
+      <Suspense fallback={<AppSkeleton />}>
+        <Routes>
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/o/:slug/login" element={<OfficeLogin />} />
+          <Route path="/invite/:token" element={<AcceptInvite />} />
+          <Route path="/join/:code" element={<JoinByReferral />} />
+          <Route path="/take/:token" element={<PublicTakeExam />} />
 
-        <Route path="/" element={hostSlug ? <OfficeAwareRoot slug={hostSlug} /> : <Protected><Dashboard /></Protected>} />
-        <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
+          <Route path="/" element={hostSlug ? <OfficeAwareRoot slug={hostSlug} /> : <RootGate />} />
+          <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
 
-        <Route path="/exams" element={<Protected><Exams /></Protected>} />
-        <Route path="/exams/:examId" element={<Protected><ExamDetail /></Protected>} />
-        <Route path="/exams/:examId/generate" element={<Protected><GenerateQuestions /></Protected>} />
-        <Route path="/exams/:examId/review" element={<Protected><ReviewQuestions /></Protected>} />
-        <Route path="/exams/:examId/settings" element={<Protected><ExamSettingsPage /></Protected>} />
-        <Route path="/exams/:examId/analytics" element={<Protected><ExamAnalytics /></Protected>} />
-        <Route path="/exams/:examId/analytics/:attemptId" element={<Protected><AttemptDetail /></Protected>} />
-        <Route path="/exams/:examId/roster" element={<Protected><ExamRoster /></Protected>} />
+          <Route path="/quizzes" element={<Protected><Exams /></Protected>} />
+          <Route path="/quizzes/:examId" element={<Protected><ExamDetail /></Protected>} />
+          <Route path="/quizzes/:examId/generate" element={<Protected><GenerateQuestions /></Protected>} />
+          <Route path="/quizzes/:examId/review" element={<Protected><ReviewQuestions /></Protected>} />
+          <Route path="/quizzes/:examId/settings" element={<Protected><ExamSettingsPage /></Protected>} />
+          <Route path="/quizzes/:examId/analytics" element={<Protected><ExamAnalytics /></Protected>} />
+          <Route path="/quizzes/:examId/analytics/:attemptId" element={<Protected><AttemptDetail /></Protected>} />
+          <Route path="/quizzes/:examId/roster" element={<Protected><ExamRoster /></Protected>} />
 
-        <Route path="/billing" element={<Protected><Billing /></Protected>} />
-        <Route path="/settings" element={<Protected><Settings /></Protected>} />
+          <Route path="/billing" element={<Protected><Billing /></Protected>} />
+          <Route path="/settings" element={<Protected><Settings /></Protected>} />
 
-        <Route path="/reports" element={<Protected><QuickReports /></Protected>} />
-        <Route path="/reports/training" element={<Protected><TrainingAnalytics /></Protected>} />
-        <Route path="/training" element={<Protected><Training /></Protected>} />
-        <Route path="/training/classes/:classId" element={<Protected><ClassDetail /></Protected>} />
+          <Route path="/reports" element={<Protected><ReportsInsights /></Protected>} />
+          <Route path="/reports/training" element={<Navigate to="/reports?view=learning" replace />} />
+          <Route path="/training" element={<Protected><Training /></Protected>} />
+          <Route path="/training/classes/:classId" element={<Protected><ClassDetail /></Protected>} />
 
-        <Route path="/tasks" element={<Protected><TasksHub /></Protected>} />
+          <Route path="/business-path" element={<Protected><BusinessPathHub /></Protected>} />
+          <Route path="/business-path/ranks/:rankId" element={<Protected><RankPathBuilder /></Protected>} />
+          {/* legacy routes kept as redirects so bookmarks/links don't break */}
+          <Route path="/tasks" element={<Navigate to="/business-path" replace />} />
+          <Route path="/rank" element={<Navigate to="/business-path" replace />} />
+          <Route path="/goals" element={<Protected><MonthlyGoals /></Protected>} />
+          <Route path="/goals/review" element={<Protected><GoalsReview /></Protected>} />
+          <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
+          <Route path="/finance" element={<Protected><FinanceWorkspace /></Protected>} />
 
-        <Route path="/team-performance" element={<Protected><TeamPerformance /></Protected>} />
-        <Route path="/team-performance/:teamId" element={<Protected><TeamDetail /></Protected>} />
-        <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
+          <Route path="/team" element={<Protected><TeamPerformance /></Protected>} />
+          <Route path="/team/:teamId" element={<Protected><TeamDetail /></Protected>} />
+          <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
 
-        <Route path="/events" element={<Protected><Events /></Protected>} />
-        <Route path="/events/new" element={<Protected><EventForm /></Protected>} />
-        <Route path="/events/:eventId" element={<Protected><EventDetail /></Protected>} />
-        <Route path="/events/:eventId/edit" element={<Protected><EventForm /></Protected>} />
+          <Route path="/events" element={<Protected><Events /></Protected>} />
+          <Route path="/events/new" element={<Protected><EventForm /></Protected>} />
+          <Route path="/events/:eventId" element={<Protected><EventDetail /></Protected>} />
+          <Route path="/events/:eventId/edit" element={<Protected><EventForm /></Protected>} />
 
-        <Route path="/leaderboard" element={<Protected><Leaderboard /></Protected>} />
+          <Route path="/leaderboard" element={<Protected><Leaderboard /></Protected>} />
 
-        <Route path="/invites" element={<Protected><Invites /></Protected>} />
-        <Route path="/invites/assign" element={<Protected><Assign /></Protected>} />
+          <Route path="/invites" element={<Protected><Invites /></Protected>} />
+          <Route path="/invites/assign" element={<Protected><Assign /></Protected>} />
 
-        <Route path="/assignments" element={<Protected><Assignments /></Protected>} />
-        <Route path="/assignments/new" element={<Protected><NewAssignment /></Protected>} />
-        <Route path="/assignments/:assignmentId" element={<Protected><AssignmentDetail /></Protected>} />
-        <Route path="/my-assignments" element={<Protected><MyAssignments /></Protected>} />
-        <Route path="/my-assignments/:assignmentId" element={<Protected><SubmitAssignment /></Protected>} />
+          <Route path="/assignments" element={<Protected><Assignments /></Protected>} />
+          <Route path="/assignments/new" element={<Protected><NewAssignment /></Protected>} />
+          <Route path="/assignments/:assignmentId" element={<Protected><AssignmentDetail /></Protected>} />
+          <Route path="/my-assignments" element={<Protected><MyAssignments /></Protected>} />
+          <Route path="/my-assignments/:assignmentId" element={<Protected><SubmitAssignment /></Protected>} />
 
-        <Route path="/cbt" element={<Protected><MyExams /></Protected>} />
-        <Route path="/cbt/:assignmentId/take" element={<Protected><TakeExam /></Protected>} />
-        <Route path="/cbt/attempts/:attemptId/result" element={<Protected><Result /></Protected>} />
+          <Route path="/my-quizzes" element={<Protected><MyExams /></Protected>} />
+          <Route path="/my-quizzes/:assignmentId/take" element={<Protected><TakeExam /></Protected>} />
+          <Route path="/my-quizzes/attempts/:attemptId/result" element={<Protected><Result /></Protected>} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* legacy — Exams → Quizzes, Team Performance → Team */}
+          <Route path="/exams/*" element={<LegacyRedirect from="/exams" to="/quizzes" />} />
+          <Route path="/cbt/*" element={<LegacyRedirect from="/cbt" to="/my-quizzes" />} />
+          <Route path="/team-performance/*" element={<LegacyRedirect from="/team-performance" to="/team" />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </AuthProvider>
   )
 }

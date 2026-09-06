@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageSkeleton } from '../../components/AppSkeleton'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
@@ -134,7 +135,7 @@ export default function AssignmentDetail() {
     await load()
   }
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
   if (!assignment) return <div className="page"><p>Assignment not found.</p></div>
 
   return (

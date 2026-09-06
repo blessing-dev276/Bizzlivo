@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { PageSkeleton } from '../../components/AppSkeleton'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
@@ -105,7 +106,7 @@ export default function SubmitAssignment() {
     }
   }
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
   if (notFound || !assignment) return <div className="page"><p>Assignment not found.</p></div>
 
   const approved = submission?.status === 'approved'

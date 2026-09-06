@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageSkeleton } from '../../components/AppSkeleton'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
@@ -102,7 +103,7 @@ export default function EventDetail() {
     if (!error && data) navigate(`/events/${data.id}/edit`)
   }
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
   if (!event) {
     return (
       <div className="page">

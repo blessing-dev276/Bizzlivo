@@ -58,7 +58,7 @@ function Avatar({ name, url }: { name: string | null; url: string | null }) {
   return <div className="avatar log-avatar">{name ? initialsOf(name) : '?'}</div>
 }
 
-export default function RecentActivity() {
+export default function RecentActivity({ compact = false, limit }: { compact?: boolean; limit?: number } = {}) {
   const { currentMembership, profile } = useAuth()
   const role = currentMembership?.role
   const orgId = currentMembership?.organization.id
@@ -170,7 +170,7 @@ export default function RecentActivity() {
           bucket: 'members',
           actorName: a.profile?.full_name ?? null,
           actorAvatarUrl: a.profile?.avatar_url ?? null,
-          text: `${who} ${a.passed ? 'passed' : 'took'} ${a.exam?.title ?? 'an exam'}`,
+          text: `${who} ${a.passed ? 'passed' : 'took'} ${a.exam?.title ?? 'a quiz'}`,
           at: a.submitted_at,
           status: a.passed === null ? undefined : { label: a.passed ? 'Passed' : 'Failed', tone: a.passed ? 'good' : 'bad' },
         })
@@ -284,7 +284,7 @@ export default function RecentActivity() {
 
       results.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
       if (!cancelled) {
-        setItems(results.slice(0, FEED_LIMIT))
+        setItems(results.slice(0, limit ?? FEED_LIMIT))
         setLoading(false)
       }
     }
@@ -293,7 +293,7 @@ export default function RecentActivity() {
     return () => {
       cancelled = true
     }
-  }, [access, orgId, profile])
+  }, [access, orgId, profile, limit])
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -305,6 +305,33 @@ export default function RecentActivity() {
   }, [items, filter, search])
 
   if (!orgId) return null
+
+  if (compact) {
+    return (
+      <div className="activity" style={{ boxShadow: 'var(--elev-1)' }}>
+        <div className="activity-head">
+          <h4>RECENT ACTIVITY</h4>
+        </div>
+        {loading ? (
+          <div className="log-line"><span className="log-text">Loading…</span></div>
+        ) : visible.length > 0 ? (
+          visible.map((item) => (
+            <div className="log-line" key={item.key}>
+              <Avatar name={item.actorName} url={item.actorAvatarUrl} />
+              <div className="log-body">
+                <span className="log-text">{item.text}</span>
+                <span className="log-module">{item.bucket}</span>
+                {item.status && <span className={`badge ${item.status.tone === 'good' ? 'active' : 'rejected'}`}>{item.status.label}</span>}
+              </div>
+              <span className="log-time">{timeAgo(item.at)}</span>
+            </div>
+          ))
+        ) : (
+          <div className="log-line"><span className="log-text">Nothing logged yet.</span></div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <section className="activity-wrap">

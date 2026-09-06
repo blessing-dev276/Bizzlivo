@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { slugCandidates } from './slug'
+import { seedDefaultRanks } from './businessPath'
 
 const UNIQUE_VIOLATION = '23505'
 
@@ -80,6 +81,15 @@ export async function completeOfficeSignup(user: User): Promise<string | null> {
     await supabase.rpc('start_trial', { target_org_id: orgId })
   } catch {
     // ignored — see comment above
+  }
+
+  // Best-effort: seed the standard Business Path ladder so the new office
+  // has a journey from day one (existing offices were seeded by
+  // 0035_business_path.sql). Idempotent — skipped if ranks already exist.
+  try {
+    await seedDefaultRanks(orgId)
+  } catch {
+    // ignored — an admin can build the journey manually from /business-path
   }
 
   return orgId

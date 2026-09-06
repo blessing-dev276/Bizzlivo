@@ -10,6 +10,17 @@ interface MemberOption {
 
 type SponsorMode = 'member' | 'other'
 
+// NeoLife distributor levels — the fixed set shown in the profile Status field.
+const PROFILE_STATUSES = [
+  'Distributor',
+  'Manager',
+  'Senior Manager',
+  'Executive Manager',
+  'Director',
+  'Emerald Director',
+  'Sapphire Director',
+]
+
 function initials(name: string | undefined | null) {
   if (!name) return '?'
   const parts = name.trim().split(/\s+/)
@@ -178,7 +189,10 @@ export default function ProfileSettings() {
 
         <label>
           Status
-          <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="What are you up to right now?" maxLength={140} />
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">Not set</option>
+            {PROFILE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
         </label>
 
         <label>

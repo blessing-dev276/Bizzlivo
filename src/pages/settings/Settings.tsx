@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import { useAuth } from '../../lib/AuthContext'
 import Billing from '../billing/Billing'
 import ProfileSettings from './ProfileSettings'
+import OfficeSettings from './OfficeSettings'
 
-// Profile and Billing are the real sections today — notifications/security
-// aren't built yet, so this stays a small shell rather than inventing empty
-// placeholder sections nobody asked for. Add more <button>/section pairs
-// here as they're built.
-type Section = 'profile' | 'billing'
+// Profile is for everyone; Office and Billing are admin-only. Add more
+// <button>/section pairs here as they're built.
+type Section = 'profile' | 'office' | 'billing'
+
+const ADMIN_ROLES = new Set(['admin'])
 
 export default function Settings() {
+  const { currentMembership } = useAuth()
+  const isAdmin = currentMembership ? ADMIN_ROLES.has(currentMembership.role) : false
   const [section, setSection] = useState<Section>('profile')
 
   return (
@@ -21,13 +25,21 @@ export default function Settings() {
         <button type="button" className={section === 'profile' ? 'active' : ''} onClick={() => setSection('profile')}>
           Profile
         </button>
-        <button type="button" className={section === 'billing' ? 'active' : ''} onClick={() => setSection('billing')}>
-          Billing
-        </button>
+        {isAdmin && (
+          <button type="button" className={section === 'office' ? 'active' : ''} onClick={() => setSection('office')}>
+            Office
+          </button>
+        )}
+        {isAdmin && (
+          <button type="button" className={section === 'billing' ? 'active' : ''} onClick={() => setSection('billing')}>
+            Billing
+          </button>
+        )}
       </div>
 
       {section === 'profile' && <ProfileSettings />}
-      {section === 'billing' && <Billing />}
+      {section === 'office' && isAdmin && <OfficeSettings />}
+      {section === 'billing' && isAdmin && <Billing />}
     </div>
   )
 }

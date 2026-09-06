@@ -40,15 +40,15 @@ export default function Onboarding() {
   return (
     <div className="page">
       <h1>Welcome to {currentMembership?.organization.name}</h1>
-      <p>Let's get your office set up. Three steps to your first exam:</p>
+      <p>Let's get your office set up. Three steps to your first quiz:</p>
 
       <ol className="checklist">
         <li className={state?.hasResource ? 'done' : ''}>
-          <Link to="/exams">1. Upload your first resource</Link>
+          <Link to="/quizzes">1. Upload your first resource</Link>
           {state?.hasResource && <span className="check">✓</span>}
         </li>
         <li className={state?.hasExam ? 'done' : ''}>
-          <Link to="/exams">2. Generate your first exam</Link>
+          <Link to="/quizzes">2. Generate your first quiz</Link>
           {state?.hasExam && <span className="check">✓</span>}
         </li>
         <li className={state?.hasInvitedTeam ? 'done' : ''}>

@@ -94,9 +94,9 @@ export default function Assign() {
     setSuccess(`Assigned to ${targets.length} target(s).`)
 
     try {
-      const examTitle = exams.find((e) => e.id === examId)?.title ?? 'an exam'
+      const examTitle = exams.find((e) => e.id === examId)?.title ?? 'a quiz'
       const userIds = await expandTargetsToUserIds(targets)
-      await notifyUsers(orgId, userIds, 'exam_assigned', { text: `You've been assigned "${examTitle}"`, link: '/cbt' })
+      await notifyUsers(orgId, userIds, 'exam_assigned', { text: `You've been assigned "${examTitle}"`, link: '/my-quizzes' })
     } catch {
       // Non-fatal — the assignment itself already succeeded.
     }
@@ -106,16 +106,16 @@ export default function Assign() {
 
   return (
     <div className="page">
-      <h1>Assign exam</h1>
+      <h1>Assign quiz</h1>
 
       {exams.length === 0 ? (
-        <p>No published exams yet. Publish an exam before assigning it.</p>
+        <p>No published quizzes yet. Publish a quiz before assigning it.</p>
       ) : (
         <form onSubmit={handleAssign} style={{ maxWidth: 480 }}>
           <label>
             Exam
             <select value={examId} onChange={(e) => setExamId(e.target.value)} required>
-              <option value="">— Select an exam —</option>
+              <option value="">— Select a quiz —</option>
               {exams.map((exam) => (
                 <option key={exam.id} value={exam.id}>{exam.title}</option>
               ))}
@@ -129,7 +129,7 @@ export default function Assign() {
 
           <h2>Scheduled window (optional)</h2>
           <p style={{ fontSize: 12.5, color: 'var(--text-faint)', marginTop: -8 }}>
-            If set, the exam can only be taken within this window — missing it counts as a failure.
+            If set, the quiz can only be taken within this window — missing it counts as a failure.
           </p>
           <label>
             Date

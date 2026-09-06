@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PageSkeleton } from '../../../components/AppSkeleton'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/AuthContext'
@@ -31,8 +32,10 @@ function initials(name: string) {
 const TYPE_LABEL: Record<ClassModuleItemType, string> = {
   video: 'Video',
   pdf: 'PDF',
+  podcast: 'Podcast',
+  link: 'Link',
   article: 'Article',
-  test: 'Test',
+  test: 'Quiz',
   quiz: 'Quiz',
   assignment: 'Assignment',
 }
@@ -151,7 +154,9 @@ export default function ClassPlayer() {
   const doneItemIds = useMemo(() => new Set(progress.map((p) => p.item_id)), [progress])
 
   function isItemComplete(item: ClassModuleItem): boolean {
-    if (item.type === 'video' || item.type === 'pdf' || item.type === 'article') return doneItemIds.has(item.id)
+    if (item.type === 'video' || item.type === 'pdf' || item.type === 'article' || item.type === 'podcast' || item.type === 'link') {
+      return doneItemIds.has(item.id)
+    }
     if (item.type === 'test' || item.type === 'quiz') {
       return attempts.some((a) => a.exam_id === item.exam_id && a.status === 'submitted' && a.passed)
     }
@@ -203,7 +208,7 @@ export default function ClassPlayer() {
     }
   }
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
   if (!classInfo) return <div className="page"><p>Class not found.</p></div>
 
   return (
@@ -297,10 +302,10 @@ export default function ClassPlayer() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {(item.type === 'video' || item.type === 'pdf') && (
+                            {(item.type === 'video' || item.type === 'pdf' || item.type === 'podcast' || item.type === 'link') && (
                               <>
-                                {urls.get(item.resource_id ?? '') && (
-                                  <a href={urls.get(item.resource_id!)} target="_blank" rel="noreferrer">Open →</a>
+                                {(item.type === 'link' ? item.link_url : urls.get(item.resource_id ?? '')) && (
+                                  <a href={item.type === 'link' ? item.link_url! : urls.get(item.resource_id!)} target="_blank" rel="noreferrer">Open →</a>
                                 )}
                                 {done ? (
                                   <>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { PageSkeleton } from '../../components/AppSkeleton'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
@@ -139,7 +140,7 @@ export default function EventForm() {
     navigate(`/events/${targetId}`)
   }
 
-  if (loading) return <div className="page"><p>Loading…</p></div>
+  if (loading) return <PageSkeleton />
 
   return (
     <div className="page" style={{ maxWidth: 560 }}>

@@ -209,7 +209,7 @@ export default function TeamPerformance() {
       setCreateError(insertError?.message ?? 'Could not create team.')
       return
     }
-    navigate(`/team-performance/${data.id}`)
+    navigate(`/team/${data.id}`)
   }
 
   const visibleTeams = useMemo(() => {
@@ -237,7 +237,7 @@ export default function TeamPerformance() {
   if (!canManage) {
     return (
       <div className="page">
-        <h1>Team Performance</h1>
+        <h1>Team</h1>
         <p>You don't have permission to view this page.</p>
       </div>
     )
@@ -247,7 +247,7 @@ export default function TeamPerformance() {
     <div className="page">
       <div className="page-head list-header" style={{ marginBottom: 0 }}>
         <div>
-          <h1>Team Performance</h1>
+          <h1>Team</h1>
           <p style={{ color: 'var(--text-dim)', margin: 0 }}>
             Growth, engagement, and performance for every team in your office.
           </p>
@@ -361,7 +361,7 @@ export default function TeamPerformance() {
                   <td><span className="badge soon-badge">Soon</span></td>
                   <td>{t.lastActivityAt ? new Date(t.lastActivityAt).toLocaleDateString() : '—'}</td>
                   <td><span className={`badge ${t.status === 'Active' ? 'active' : ''}`}>{t.status}</span></td>
-                  <td><Link to={`/team-performance/${t.id}`}>View Details →</Link></td>
+                  <td><Link to={`/team/${t.id}`}>View Details →</Link></td>
                 </tr>
               ))}
             </tbody>

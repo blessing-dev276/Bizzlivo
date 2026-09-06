@@ -1,0 +1,40 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Don't run two deploys of the same ref at once; newer commit wins.
+concurrency:
+  group: netlify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # `netlify deploy --build` runs `npm run build` per netlify.toml, then
+      # ships dist/. --prod on main; every other branch / PR gets a preview URL.
+      - name: Deploy
+        run: |
+          npx --yes netlify-cli@latest deploy \
+            --build \
+            ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} \
+            --message "${{ github.event.head_commit.message || github.event.pull_request.title }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: a9c821a8-7cf0-4a69-8d17-e1a9d0cc64cb
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}

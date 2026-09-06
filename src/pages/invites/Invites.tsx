@@ -92,6 +92,12 @@ export default function Invites() {
   const [roleError, setRoleError] = useState<string | null>(null)
   const canEditRoles = currentMembership?.role === 'admin'
 
+  const [sponsorMode, setSponsorMode] = useState<'member' | 'other'>('member')
+  const [sponsorMemberId, setSponsorMemberId] = useState('')
+  const [sponsorName, setSponsorName] = useState('')
+  const [sponsorSaving, setSponsorSaving] = useState(false)
+  const [sponsorMsg, setSponsorMsg] = useState<{ type: 'error' | 'ok'; text: string } | null>(null)
+
   async function load() {
     if (!orgId) return
     const [memberRes, examRes, attemptRes, inviteRes, pendingRes, groupRes] = await Promise.all([
@@ -252,6 +258,46 @@ export default function Invites() {
       .eq('id', pm.id)
     setApprovingId(null)
     await load()
+  }
+
+  // Sync the sponsor form to whichever member's drawer is open.
+  useEffect(() => {
+    if (!drawerMember) return
+    const p = drawerMember.profile
+    if (p.sponsor_member_id) {
+      setSponsorMode('member')
+      setSponsorMemberId(p.sponsor_member_id)
+      setSponsorName('')
+    } else {
+      setSponsorMode(p.sponsor_name ? 'other' : 'member')
+      setSponsorMemberId('')
+      setSponsorName(p.sponsor_name ?? '')
+    }
+    setSponsorMsg(null)
+  }, [drawerMember])
+
+  async function saveSponsor() {
+    if (!drawerMember) return
+    const target = drawerMember
+    const memberId = sponsorMode === 'member' ? sponsorMemberId || null : null
+    const name = sponsorMode === 'other' ? sponsorName.trim() || null : null
+    if (sponsorMode === 'member' && !memberId) return setSponsorMsg({ type: 'error', text: 'Pick a member.' })
+    if (sponsorMode === 'other' && !name) return setSponsorMsg({ type: 'error', text: "Enter the sponsor's name." })
+
+    setSponsorSaving(true)
+    setSponsorMsg(null)
+    const { error: rpcErr } = await supabase.rpc('admin_set_sponsor', {
+      target_user_id: target.profile.id,
+      new_sponsor_member_id: memberId,
+      new_sponsor_name: name,
+    })
+    setSponsorSaving(false)
+    if (rpcErr) return setSponsorMsg({ type: 'error', text: rpcErr.message })
+
+    const patch = { sponsor_member_id: memberId, sponsor_name: name }
+    setMembers((prev) => prev.map((m) => (m.id === target.id ? { ...m, profile: { ...m.profile, ...patch } } : m)))
+    setDrawerMember((prev) => (prev && prev.id === target.id ? { ...prev, profile: { ...prev.profile, ...patch } } : prev))
+    setSponsorMsg({ type: 'ok', text: 'Sponsor updated.' })
   }
 
   async function handleRoleChange(member: MemberRow, newRole: MembershipRole) {
@@ -470,6 +516,51 @@ export default function Invites() {
               )}
             </label>
             {roleError && <p className="form-error">{roleError}</p>}
+
+            {canEditRoles && (
+              <div style={{ margin: '10px 0 4px' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>SPONSOR</div>
+                <div className="cycle-toggle" style={{ marginBottom: 8 }}>
+                  <button type="button" className={sponsorMode === 'member' ? 'active' : ''} onClick={() => setSponsorMode('member')}>
+                    Office member
+                  </button>
+                  <button type="button" className={sponsorMode === 'other' ? 'active' : ''} onClick={() => setSponsorMode('other')}>
+                    Outside the office
+                  </button>
+                </div>
+                {sponsorMode === 'member' ? (
+                  <select
+                    value={sponsorMemberId}
+                    onChange={(e) => setSponsorMemberId(e.target.value)}
+                    style={{ maxWidth: 240 }}
+                  >
+                    <option value="">Select a member…</option>
+                    {members
+                      .filter((m) => m.profile.id !== drawerMember.profile.id)
+                      .map((m) => (
+                        <option key={m.profile.id} value={m.profile.id}>{m.profile.full_name}</option>
+                      ))}
+                  </select>
+                ) : (
+                  <input
+                    value={sponsorName}
+                    onChange={(e) => setSponsorName(e.target.value)}
+                    placeholder="Sponsor's name"
+                    style={{ maxWidth: 240 }}
+                  />
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <button type="button" onClick={saveSponsor} disabled={sponsorSaving}>
+                    {sponsorSaving ? 'Saving…' : 'Save sponsor'}
+                  </button>
+                </div>
+                {sponsorMsg && (
+                  <p className={sponsorMsg.type === 'error' ? 'form-error' : 'form-info'} style={{ marginTop: 6 }}>
+                    {sponsorMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div style={{ margin: '10px 0 4px' }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>TEAM</div>

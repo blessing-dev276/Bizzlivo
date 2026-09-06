@@ -41,6 +41,7 @@ export interface Profile {
   status: string | null
   sponsor_member_id: string | null
   sponsor_name: string | null
+  referral_code: string | null
   created_at: string
 }
 
@@ -359,22 +360,47 @@ export interface OnboardingProgress {
   registered_at: string | null
 }
 
-// A step can hold several resources now (mix of PDFs, videos, links) —
-// see 0024_onboarding_multi_resource.sql. Registration isn't a step here;
-// it stays a single link on OnboardingSettings.
+// A step can hold several items (mix of PDFs, videos, links, quizzes) —
+// see 0024_onboarding_multi_resource.sql + 0036_onboarding_quiz.sql.
+// Registration isn't a step here; it stays a single link on OnboardingSettings.
 export type OnboardingStep = 'business_explanation' | 'network_varsity' | 'office_policy'
-export type OnboardingItemType = 'pdf' | 'video' | 'link'
+export type OnboardingItemType = 'pdf' | 'video' | 'link' | 'quiz'
 
 export interface OnboardingStepItem {
   id: string
   org_id: string
-  step: OnboardingStep
+  step: OnboardingStep // legacy — superseded by module_id (0038)
+  module_id: string | null
   type: OnboardingItemType
   title: string
   file_path: string | null
   link_url: string | null
+  exam_id: string | null
   order_index: number
   created_by: string
+  created_at: string
+}
+
+// Learning Center v2 (0038): the Module grouping layer above onboarding items.
+export interface OnboardingModule {
+  id: string
+  org_id: string
+  title: string
+  description: string | null
+  order_index: number
+  status: 'draft' | 'published'
+  created_by: string
+  created_at: string
+}
+
+// Per-member, per-item onboarding completion. Only written for
+// video/pdf/link items — quiz completion is derived from `attempts`.
+export interface OnboardingItemProgress {
+  id: string
+  org_id: string
+  item_id: string
+  user_id: string
+  completed_at: string
   created_at: string
 }
 
@@ -410,7 +436,11 @@ export type ClassStatus = 'draft' | 'published' | 'archived'
 // classes/class_modules/class_module_items schema and editor, tagged by
 // purpose the same way resources.purpose separates book/skill_set/
 // freelancing content on one shared `resources` table.
-export type ClassPurpose = 'skill_development' | 'income_development'
+export type ClassPurpose = 'skill_development' | 'income_development' // legacy — superseded by LearningArea (0038)
+
+// Learning Center v2 (0038): every classes-backed learning area. A `class`
+// row is a Section within its area; `section_order` orders sections.
+export type LearningArea = 'onboarding' | 'network_marketing' | 'freelancing' | 'personal_development' | 'income_development'
 
 export interface SkillClass {
   id: string
@@ -418,7 +448,9 @@ export interface SkillClass {
   title: string
   description: string | null
   status: ClassStatus
-  purpose: ClassPurpose
+  purpose: ClassPurpose | null
+  area: LearningArea | null
+  section_order: number
   created_by: string
   created_at: string
 }
@@ -428,11 +460,13 @@ export interface ClassModule {
   class_id: string
   org_id: string
   title: string
+  description: string | null
+  status: 'draft' | 'published'
   order_index: number
   created_at: string
 }
 
-export type ClassModuleItemType = 'video' | 'pdf' | 'article' | 'test' | 'quiz' | 'assignment'
+export type ClassModuleItemType = 'video' | 'pdf' | 'article' | 'test' | 'quiz' | 'assignment' | 'link' | 'podcast'
 
 export interface ClassModuleItem {
   id: string
@@ -445,6 +479,7 @@ export interface ClassModuleItem {
   body: string | null
   exam_id: string | null
   coursework_assignment_id: string | null
+  link_url: string | null
   created_by: string
   created_at: string
 }
@@ -532,6 +567,12 @@ export interface NetworkMarketingProduct {
   name: string
   description: string | null
   link_url: string | null
+  // Learning Center v2 (0038): named content slots + catalog ordering.
+  video_resource_id: string | null
+  pdf_resource_id: string | null
+  exam_id: string | null
+  order_index: number
+  is_active: boolean
   added_by: string
   created_at: string
 }
@@ -558,6 +599,10 @@ export interface NetworkMarketingContact {
   stage: NetworkMarketingContactStage
   interested_product_id: string | null
   notes: string | null
+  source: string | null
+  next_follow_up_at: string | null
+  last_contacted_at: string | null
+  linked_member_id: string | null
   created_at: string
   updated_at: string
 }
@@ -591,4 +636,351 @@ export interface TaskFlowStep {
   coursework_assignment_id: string | null
   created_by: string
   created_at: string
+}
+
+// Member Dashboard v2 (0034_member_dashboard.sql) — a member-owned
+// monthly goal list, a daily work-report log (also the source of the
+// "report streak"), and the member's spot on the rank ladder (the ladder
+// itself is in src/lib/rank.ts).
+export type GoalStatus =
+  | 'draft' | 'active' | 'submitted' | 'changes_requested' | 'approved'
+  | 'rejected' | 'month_closed_incomplete' | 'cancelled' | 'legacy_completed'
+export type GoalType = 'binary' | 'number' | 'currency' | 'percent'
+export type GoalCategory =
+  | 'learning' | 'network' | 'income' | 'personal_development' | 'business_path' | 'team' | 'other'
+export type GoalPeriodType = 'monthly' | 'quarter'
+export type GoalPriority = 'low' | 'normal' | 'high'
+
+export interface MemberMonthlyGoal {
+  id: string
+  org_id: string
+  user_id: string
+  month: string // 'YYYY-MM' — the (starting) period key
+  title: string
+  description: string | null
+  category: GoalCategory | null
+  goal_type: GoalType
+  unit: string | null
+  target_value: number | null
+  progress_value: number
+  priority: GoalPriority
+  due_date: string | null
+  status: GoalStatus
+  period_type: GoalPeriodType
+  period_start: string | null
+  period_end: string | null
+  parent_goal_id: string | null
+  progress_mode: 'manual' | 'auto'
+  submitted_at: string | null
+  submission_note: string | null
+  evidence_url: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
+  review_note: string | null
+  closed_at: string | null
+  // legacy columns kept in sync for rollback / existing consumers
+  metric: string | null
+  target: number | null
+  progress: number
+  done: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MemberDailyReport {
+  id: string
+  org_id: string
+  user_id: string
+  report_on: string // 'YYYY-MM-DD'
+  summary: string
+  wins: string | null
+  blockers: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MemberRankProgress {
+  org_id: string
+  user_id: string
+  current_rank: string | null // legacy text key — superseded by current_rank_id (0035)
+  current_rank_id: string | null
+  started_at: string | null
+  completed_at: string | null
+  updated_at: string
+}
+
+// ===== Business Path (0035_business_path.sql) =====
+// Org-managed rank progression that orchestrates existing Learning Center
+// + activity systems. Supersedes task_flow_steps and the hardcoded rank
+// ladder in src/lib/rank.ts.
+export type BusinessPathSection = 'learning' | 'task'
+export type PromotionMode = 'automatic' | 'approval'
+export type ValidationMode = 'automatic' | 'manual'
+export type BusinessPathItemKind =
+  | 'class'
+  | 'exam'
+  | 'assignment'
+  | 'resource'
+  | 'link'
+  | 'daily_reports'
+  | 'prospects_added'
+  | 'followups_logged'
+  | 'event_attendance'
+  | 'income_logged'
+  | 'monthly_goal'
+  | 'manual_admin'
+  | 'manual_self'
+  // rank-aware requirement kinds — 0040_business_path_requirements.sql
+  | 'profile_completion'
+  | 'onboarding_completion'
+  | 'learning_count'
+  | 'goal_created'
+  | 'three_month_goals'
+  | 'direct_member_count'
+
+export type BusinessPathItemProgressStatus =
+  | 'awaiting_approval'
+  | 'approved'
+  | 'rejected'
+  | 'changes_requested'
+  | 'complete'
+
+export interface BusinessPathRank {
+  id: string
+  org_id: string
+  slug: string
+  name: string
+  description: string | null
+  order_index: number
+  color: string | null
+  icon: string | null
+  is_active: boolean
+  promotion_mode: PromotionMode
+  created_at: string
+  updated_at: string
+}
+
+export interface BusinessPathItem {
+  id: string
+  org_id: string
+  rank_id: string
+  section: BusinessPathSection
+  kind: BusinessPathItemKind
+  title: string
+  instructions: string | null
+  order_index: number
+  is_required: boolean
+  class_id: string | null
+  exam_id: string | null
+  coursework_assignment_id: string | null
+  resource_id: string | null
+  link_url: string | null
+  event_id: string | null
+  target_count: number | null
+  target_amount: number | null
+  validation_mode: ValidationMode
+  learning_area: LearningArea | null
+  config: Record<string, unknown> | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface MemberRankHistoryRow {
+  id: string
+  org_id: string
+  user_id: string
+  rank_id: string
+  achieved_at: string
+  approved_by: string | null
+  created_at: string
+}
+
+export interface BusinessPathItemProgressRow {
+  id: string
+  org_id: string
+  user_id: string
+  item_id: string
+  status: BusinessPathItemProgressStatus
+  completed_at: string
+  marked_by: string | null
+  note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  created_at: string
+}
+
+export interface WeeklyLeaderboardEntry {
+  name: string
+  value: number
+}
+
+export interface WeeklyLeaderboard {
+  week_start: string
+  top_earner: WeeklyLeaderboardEntry | null
+  top_producer: WeeklyLeaderboardEntry | null
+  most_improved: WeeklyLeaderboardEntry | null
+}
+
+// ============================================================
+// Finance / Wallet v2 (0043_finance.sql)
+// Verified office earnings — ledger-backed. Separate from the
+// self-reported IncomeDevelopmentIncomeEntry ("personal income").
+// ============================================================
+
+export type FinanceOrderStatus =
+  | 'order_received' | 'pending_settlement' | 'settled'
+  | 'available' | 'partially_paid' | 'paid' | 'cancelled'
+
+export type FinanceChargeType =
+  | 'platform_fee' | 'withdrawal_fee' | 'conversion_fee'
+  | 'bank_charge' | 'service_charge' | 'other'
+
+export type FinanceLedgerEntryType =
+  | 'order_recorded' | 'settlement' | 'conversion' | 'charge' | 'charge_reversal'
+  | 'available_credit' | 'withdrawal_reserve' | 'withdrawal_release' | 'payout' | 'adjustment'
+
+export type WithdrawalStatus =
+  | 'requested' | 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled'
+
+export interface FinanceOrder {
+  id: string
+  org_id: string
+  member_id: string
+  platform: string
+  title: string
+  order_reference: string | null
+  description: string | null
+  proof_url: string | null
+  order_date: string
+  gross_amount: number
+  currency: string
+  status: FinanceOrderStatus
+  platform_deduction: number | null
+  settled_amount: number | null
+  settled_on: string | null
+  settlement_currency: string | null
+  settled_by: string | null
+  converted: boolean
+  from_currency: string | null
+  to_currency: string | null
+  exchange_rate: number | null
+  converted_amount: number | null
+  conversion_date: string | null
+  available_amount: number | null
+  available_currency: string | null
+  credited_at: string | null
+  credited_by: string | null
+  cancelled_reason: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface FinanceCharge {
+  id: string
+  org_id: string
+  order_id: string
+  member_id: string
+  charge_type: FinanceChargeType
+  description: string | null
+  amount: number
+  currency: string
+  charge_date: string
+  voided: boolean
+  voided_reason: string | null
+  voided_at: string | null
+  reversal_of: string | null
+  added_by: string
+  created_at: string
+}
+
+export interface FinanceLedgerEntry {
+  id: string
+  org_id: string
+  member_id: string
+  entry_type: FinanceLedgerEntryType
+  amount: number
+  currency: string
+  affects_balance: boolean
+  order_id: string | null
+  charge_id: string | null
+  withdrawal_id: string | null
+  note: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface WithdrawalRequest {
+  id: string
+  org_id: string
+  member_id: string
+  reference: string
+  amount: number
+  currency: string
+  method: string | null
+  payout_account_id: string | null
+  payout_snapshot: { bank_name: string; account_name: string; account_number: string } | null
+  member_note: string | null
+  status: WithdrawalStatus
+  available_before: number | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  admin_note: string | null
+  decided_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancePayout {
+  id: string
+  org_id: string
+  member_id: string
+  withdrawal_id: string
+  amount_paid: number
+  currency: string
+  paid_on: string
+  method: string | null
+  reference: string | null
+  proof_url: string | null
+  admin_note: string | null
+  recorded_by: string
+  created_at: string
+}
+
+export interface FinanceEvent {
+  id: string
+  org_id: string
+  actor_id: string | null
+  member_id: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  reason: string | null
+  created_at: string
+}
+
+export interface MemberPayoutAccount {
+  id: string
+  org_id: string
+  user_id: string
+  bank_name: string
+  account_name: string
+  account_number: string
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface MoneyByCurrency { currency: string; amount: number }
+
+export interface FinanceMemberBalances {
+  available: MoneyByCurrency[]
+  lifetime_gross: MoneyByCurrency[]
+  pending_platform: MoneyByCurrency[]
+  pending_withdrawal: MoneyByCurrency[]
+  total_paid_out: MoneyByCurrency[]
 }
