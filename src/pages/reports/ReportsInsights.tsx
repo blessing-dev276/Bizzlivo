@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/AuthContext'
+import { useOrgUsage } from '../../lib/plans'
+import { reportsLevel } from '../../lib/entitlements'
 import { supabase } from '../../lib/supabase'
 import { PRESET_LABELS, resolveRange, type RangePreset } from '../../lib/reports/range'
 import { reportsApi } from '../../lib/reports/api'
@@ -8,6 +10,7 @@ import type { OverviewReport } from '../../lib/reports/types'
 import { BarList, EmptyState, MetricCard, ReportSection, SectionError, Sparkline, naira, pct } from './reportShared'
 import {
   BusinessPathTab,
+  GoalsTab,
   IncomeTab,
   LearningTab,
   NetworkTab,
@@ -16,16 +19,20 @@ import {
 } from './reportTabs'
 import { exportOverviewCsv } from './reportExport'
 
-type View = 'overview' | 'business-path' | 'learning' | 'network' | 'teams' | 'income'
+type View = 'overview' | 'business-path' | 'learning' | 'goals' | 'network' | 'teams' | 'income'
 const VIEWS: { id: View; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'business-path', label: 'Business Path' },
   { id: 'learning', label: 'Learning' },
+  { id: 'goals', label: 'Goals' },
   { id: 'network', label: 'Network' },
   { id: 'teams', label: 'Teams' },
   { id: 'income', label: 'Income' },
 ]
-const PRESETS: RangePreset[] = ['today', 'this_week', 'this_month', 'last_month', 'last_30_days', 'last_90_days', 'custom']
+const PRESETS_ALL: RangePreset[] = ['today', 'this_week', 'this_month', 'last_month', 'last_30_days', 'last_90_days', 'custom']
+// Free (reports_level 'basic') gets recent windows only — no long history,
+// no custom range. 'full'/'advanced' get everything.
+const PRESETS_BASIC: RangePreset[] = ['today', 'this_week', 'this_month', 'last_30_days']
 
 interface OptionRow {
   id: string
@@ -41,10 +48,19 @@ export default function ReportsInsights() {
   const view = (VIEWS.find((v) => v.id === params.get('view'))?.id ?? 'overview') as View
   const isTrainer = role === 'trainer'
 
+  const { usage } = useOrgUsage(orgId)
+  const level = reportsLevel(usage)
+  const PRESETS = level === 'basic' ? PRESETS_BASIC : PRESETS_ALL
+
   // ---- filter state ----
   const [preset, setPreset] = useState<RangePreset>('this_month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+
+  // Snap back to an allowed window if the plan doesn't include this one.
+  useEffect(() => {
+    if (!PRESETS.includes(preset)) setPreset('this_month')
+  }, [PRESETS, preset])
   const [teamId, setTeamId] = useState('')
   const [memberId, setMemberId] = useState('')
   const [rankName, setRankName] = useState('')
@@ -185,9 +201,10 @@ export default function ReportsInsights() {
         </div>
       )}
 
-      {orgId && effectiveView === 'overview' && <OverviewTab orgId={orgId} filters={filters} onJump={setView} />}
+      {orgId && effectiveView === 'overview' && <OverviewTab orgId={orgId} filters={filters} onJump={setView} canExport={level === "advanced"} />}
       {orgId && effectiveView === 'business-path' && <BusinessPathTab orgId={orgId} filters={filters} />}
       {orgId && effectiveView === 'learning' && <LearningTab orgId={orgId} filters={filters} />}
+      {orgId && effectiveView === 'goals' && <GoalsTab orgId={orgId} filters={filters} />}
       {orgId && effectiveView === 'network' && <NetworkTab orgId={orgId} filters={filters} />}
       {orgId && effectiveView === 'teams' && <TeamsTab orgId={orgId} filters={filters} />}
       {orgId && effectiveView === 'income' && <IncomeTab orgId={orgId} filters={filters} />}
@@ -202,10 +219,12 @@ function OverviewTab({
   orgId,
   filters,
   onJump,
+  canExport,
 }: {
   orgId: string
   filters: ReportFilters
   onJump: (v: View) => void
+  canExport: boolean
 }) {
   const [data, setData] = useState<OverviewReport | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
@@ -244,11 +263,15 @@ function OverviewTab({
       <ReportSection
         title="Executive Overview"
         action={
-          d && (
+          d && (canExport ? (
             <button type="button" className="rp-btn ghost sm" onClick={() => exportOverviewCsv(d, filters.range)}>
               Export CSV
             </button>
-          )
+          ) : (
+            <Link to="/billing" className="rp-btn ghost sm" title="CSV export is on the Business plan">
+              Export · Business
+            </Link>
+          ))
         }
       >
         <div className="rp-metrics">

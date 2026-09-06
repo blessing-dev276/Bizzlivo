@@ -64,11 +64,22 @@ type Db = ReturnType<typeof createClient>
 async function loadPublishedExam(db: Db, token: string) {
   const { data: exam, error } = await db
     .from('exams')
-    .select('id, org_id, title, public_link_enabled, status, organizations(name)')
+    .select('id, org_id, title, public_link_enabled, status, organizations(name, plan_tier, logo_url)')
     .eq('public_token', token)
     .maybeSingle()
   if (error || !exam || !exam.public_link_enabled || exam.status !== 'published') return null
   return exam
+}
+
+// "Remove Bizzlivo badge" entitlement for the public quiz-taking screens.
+async function orgBadgeFlags(db: Db, org: unknown): Promise<{ removes_badge: boolean; logo_url: string | null }> {
+  const o = org as { plan_tier?: string; logo_url?: string | null } | null
+  let removes = false
+  if (o?.plan_tier) {
+    const { data } = await db.from('plan_limits').select('removes_badge').eq('plan', o.plan_tier).maybeSingle()
+    removes = !!(data as { removes_badge: boolean } | null)?.removes_badge
+  }
+  return { removes_badge: removes, logo_url: o?.logo_url ?? null }
 }
 
 async function buildQuestions(db: Db, examId: string, settings: ExamSettingsRow) {
@@ -118,10 +129,13 @@ Deno.serve(async (req) => {
         .single()
       if (settingsError || !settings) return jsonResponse({ error: 'This exam has no settings configured yet.' }, 500)
 
+      const badge = await orgBadgeFlags(db, exam.organizations)
       return jsonResponse({
         exam_title: exam.title,
         office_name: officeName,
         time_limit_minutes: settings.time_limit_minutes,
+        removes_badge: badge.removes_badge,
+        office_logo_url: badge.logo_url,
       })
     }
 
@@ -259,12 +273,15 @@ Deno.serve(async (req) => {
       const questions = await buildQuestions(db, exam.id, settings as ExamSettingsRow)
       if (!questions) return jsonResponse({ error: 'This exam has no approved questions yet.' }, 422)
 
+      const badge2 = await orgBadgeFlags(db, exam.organizations)
       return jsonResponse({
         attempt_id: attempt!.id,
         org_id: exam.org_id,
         exam_title: exam.title,
         office_name: officeName,
         time_limit_minutes: settings.time_limit_minutes,
+        removes_badge: badge2.removes_badge,
+        office_logo_url: badge2.logo_url,
         started_at: attempt!.started_at,
         questions,
       })

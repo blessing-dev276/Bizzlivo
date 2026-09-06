@@ -2,14 +2,15 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { PLAN_COPY, trialDaysLeft, useOrgUsage } from '../lib/plans'
+import { trialDaysLeft, useOrgUsage } from '../lib/plans'
+import { PLAN_META } from '../lib/entitlements'
 import ThemeToggle from './ThemeToggle'
 import NotificationBell from './NotificationBell'
 import ProfileMenu from './ProfileMenu'
 
 const ADMIN_ROLES = new Set(['admin', 'trainer'])
 const MANAGE_ROLES = new Set(['admin'])
-const SIDEBAR_COLLAPSED_KEY = 'hq360.sidebarCollapsed'
+const SIDEBAR_COLLAPSED_KEY = 'bizzlivo.sidebarCollapsed'
 
 function initials(name: string | undefined | null) {
   if (!name) return '?'
@@ -152,6 +153,25 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [switchOpen])
 
+  // Custom brand colour (Business `custom_branding` entitlement). Applied as
+  // the accent override for the whole shell; cleared when switching to an
+  // office without one.
+  const brandColor = currentMembership?.organization.brand_color
+  useEffect(() => {
+    const el = document.documentElement
+    if (brandColor && /^#[0-9a-f]{6}$/i.test(brandColor)) {
+      el.style.setProperty('--accent', brandColor)
+      el.style.setProperty('--gold', brandColor)
+    } else {
+      el.style.removeProperty('--accent')
+      el.style.removeProperty('--gold')
+    }
+    return () => {
+      el.style.removeProperty('--accent')
+      el.style.removeProperty('--gold')
+    }
+  }, [brandColor])
+
   function toggleCollapsed() {
     setCollapsed((c) => {
       const next = !c
@@ -189,13 +209,13 @@ export default function Layout({ children }: { children: ReactNode }) {
   const planLabel = usage
     ? usage.status === 'trialing' && daysLeft !== null
       ? `Trial · ${daysLeft}d left`
-      : PLAN_COPY[usage.plan].label
+      : PLAN_META[usage.plan].label
     : null
   const isTopTier = usage?.plan === 'business' && usage.status !== 'trialing'
   const org = currentMembership?.organization
   const canSwitchOffice = memberships.length > 1
 
-  // The office is the brand — its logo + name sit where the HQ360 wordmark
+  // The office is the brand — its logo + name sit where the Bizzlivo wordmark
   // used to. When the user belongs to more than one office it doubles as the
   // office switcher (there's no longer an office tag in the topbar).
   const brandInner = (
@@ -203,9 +223,9 @@ export default function Layout({ children }: { children: ReactNode }) {
       {org?.logo_url ? (
         <img className="office-logo-img" src={org.logo_url} alt="" />
       ) : (
-        <span className="logo-mark">{initials(org?.name ?? 'HQ')}</span>
+        <span className="logo-mark">{initials(org?.name ?? 'BZ')}</span>
       )}
-      <span className="office-logo-name">{org?.name ?? 'HQ360'}</span>
+      <span className="office-logo-name">{org?.name ?? 'Bizzlivo'}</span>
     </>
   )
 

@@ -1,42 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import type { OrgUsage, PlanLimits, PlanTier } from '../types/database'
+import type { OrgUsage, PlanLimits } from '../types/database'
+import { PLAN_ORDER } from './entitlements'
 
-export const PLAN_ORDER: PlanTier[] = ['free', 'growth', 'business']
-
-export const PLAN_COPY: Record<PlanTier, { label: string; who: string }> = {
-  free: { label: 'Free', who: 'Pilot a single office, evaluate the exam loop.' },
-  growth: { label: 'Growth', who: 'Running certification for a real team, ongoing.' },
-  business: { label: 'Business', who: 'Multi-team operations, own branding.' },
-}
-
-export function formatNaira(kobo: number): string {
-  return `₦${Math.round(kobo / 100).toLocaleString('en-NG')}`
-}
-
-export function yearlySavingsLabel(limits: PlanLimits): string | null {
-  if (limits.price_monthly_kobo === 0) return null
-  const fullYear = limits.price_monthly_kobo * 12
-  const saved = fullYear - limits.price_yearly_kobo
-  if (saved <= 0) return null
-  const monthsFree = Math.round(saved / limits.price_monthly_kobo)
-  return `save ${monthsFree} month${monthsFree === 1 ? '' : 's'}`
-}
-
-export function planFeatureList(limits: PlanLimits): string[] {
-  const features = [
-    limits.max_members ? `Up to ${limits.max_members} members` : 'Unlimited members',
-    limits.max_resources ? `${limits.max_resources} resources uploaded` : 'Unlimited resources',
-    limits.max_published_exams
-      ? `${limits.max_published_exams} published exam${limits.max_published_exams === 1 ? '' : 's'} at a time`
-      : 'Unlimited published exams',
-    `${limits.ai_exam_generations_per_month} AI exam generations / month`,
-    `${limits.ai_questions_per_month} AI-generated questions / month`,
-  ]
-  features.push(limits.removes_badge ? 'Public link, no HQ360 badge' : 'Public link, "Powered by HQ360" badge')
-  if (limits.custom_branding) features.push('Custom logo + brand color')
-  return features
-}
+// Card copy + entitlement helpers now live in ./entitlements. This module
+// keeps only the data-loading hooks + trial math.
+export { PLAN_ORDER } from './entitlements'
+export { nairaFromKobo as formatNaira } from './entitlements'
 
 export async function fetchPlanLimits(): Promise<PlanLimits[]> {
   const { data, error } = await supabase.from('plan_limits').select('*')

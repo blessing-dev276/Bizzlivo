@@ -102,13 +102,13 @@ Deno.serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'HQ360 <onboarding@resend.dev>',
+        from: 'Bizzlivo <onboarding@resend.dev>',
         to: pending.email,
-        subject: `You're in! Join ${org.name} on HQ360`,
+        subject: `You're in! Join ${org.name} on Bizzlivo`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color: #12161d;">
             <h2 style="margin-bottom: 4px;">Welcome to ${org.name}</h2>
-            <p style="color: #5b6472;">Hi ${pending.full_name}, your request to join ${org.name} on HQ360 has been approved.</p>
+            <p style="color: #5b6472;">Hi ${pending.full_name}, your request to join ${org.name} on Bizzlivo has been approved.</p>
             <p>
               <a href="${inviteUrl}" style="display: inline-block; background: #b9761a; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">
                 Set your password &amp; join

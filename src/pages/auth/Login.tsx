@@ -1,3 +1,4 @@
+import BrandLogo from '../../components/BrandLogo'
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -35,8 +36,7 @@ export default function Login() {
       </div>
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}>
         <div className="auth-logo">
-          <span className="logo-mark">H</span>
-          HQ<span>360</span>
+          <BrandLogo size={30} tagline />
         </div>
         <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Log in</h1>

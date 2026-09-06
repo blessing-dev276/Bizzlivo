@@ -1,6 +1,6 @@
-# HQ360 — Project Context & AI Handoff Document
+# Bizzlivo — Project Context & AI Handoff Document
 
-> **Purpose of this file**: This is the single source of truth for continuing development on HQ360 without re-inspecting the codebase from scratch. It documents every module, feature, database table, route, component, edge function, workflow, business rule, dependency, and folder that exists as of the date below. If you are a future Claude session picking up this project, read this document fully before touching code — it should answer "how does X work" and "why was X built this way" for nearly everything in the repo.
+> **Purpose of this file**: This is the single source of truth for continuing development on Bizzlivo without re-inspecting the codebase from scratch. It documents every module, feature, database table, route, component, edge function, workflow, business rule, dependency, and folder that exists as of the date below. If you are a future Claude session picking up this project, read this document fully before touching code — it should answer "how does X work" and "why was X built this way" for nearly everything in the repo.
 >
 > **Last updated**: 2026-07-23 (after: coursework assignments feature, exam-link auto-registration + scheduled windows, and role-editing/Trainer rename).
 >
@@ -8,9 +8,9 @@
 
 ---
 
-## 1. What HQ360 is
+## 1. What Bizzlivo is
 
-HQ360 is a multi-tenant B2B SaaS platform for small offices/training businesses ("Synergy Office" is the one real tenant seen in this session) to run internal training and competency assessment. Each tenant is called an **office** (DB term: **organization**). An office can:
+Bizzlivo is a multi-tenant B2B SaaS platform for small offices/training businesses ("Synergy Office" is the one real tenant seen in this session) to run internal training and competency assessment. Each tenant is called an **office** (DB term: **organization**). An office can:
 
 - Upload PDF training resources.
 - Auto-generate multiple-choice/true-false exam questions from a resource via an LLM (Groq), then have a human review/approve/reject/edit each question before publishing.
@@ -20,7 +20,7 @@ HQ360 is a multi-tenant B2B SaaS platform for small offices/training businesses 
 - Manage team membership and roles (Member / Trainer / Admin, plus an immutable Owner for whoever created the office).
 - Invite people directly, or let them self-request to join via a branded office login page or by taking a public exam link.
 
-There is also a **platform-admin** layer (HQ360's own internal staff, not tied to any one office) with schema/RPC support for listing/managing all offices — this exists in the database but has **no frontend UI built for it yet** (see §14).
+There is also a **platform-admin** layer (Bizzlivo's own internal staff, not tied to any one office) with schema/RPC support for listing/managing all offices — this exists in the database but has **no frontend UI built for it yet** (see §14).
 
 ---
 
@@ -95,7 +95,7 @@ Only these two are used client-side (Vite exposes anything prefixed `VITE_`). No
 ## 3. Repository structure (full file tree)
 
 ```
-/Users/synergy/Development/HQ360/
+/Users/synergy/Development/Bizzlivo/
 ├── PROJECT_CONTEXT.md                          — this file
 ├── package.json / firebase.json / .firebaserc / vite.config.ts / tsconfig*.json / .env / .env.example
 ├── src/
@@ -207,7 +207,7 @@ The word `instructor` is hardcoded into `array['owner','admin','instructor']` RL
 
 ### 4.4 Platform admins (separate, unrelated role system)
 
-`platform_admins` (table, `0003_platform_admin_and_public_link.sql`) is **not** part of the org membership/role system at all — it's a separate flag for HQ360's own internal staff, checked via `is_platform_admin()` (a security-definer function). This has full schema + RPC support (`admin_list_offices`, `admin_get_office_detail`, `admin_set_office_status`, `admin_set_plan_tier`, all granted to `authenticated` but self-guarding via `is_platform_admin()` inside the function body) but **no frontend page consumes any of this** — it's backend-only, unused by the React app as of this writing. See §14.
+`platform_admins` (table, `0003_platform_admin_and_public_link.sql`) is **not** part of the org membership/role system at all — it's a separate flag for Bizzlivo's own internal staff, checked via `is_platform_admin()` (a security-definer function). This has full schema + RPC support (`admin_list_offices`, `admin_get_office_detail`, `admin_set_office_status`, `admin_set_plan_tier`, all granted to `authenticated` but self-guarding via `is_platform_admin()` inside the function body) but **no frontend page consumes any of this** — it's backend-only, unused by the React app as of this writing. See §14.
 
 ---
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { useOrgUsage } from '../../lib/plans'
@@ -9,7 +9,7 @@ export default function ExamSettings() {
   const { examId } = useParams<{ examId: string }>()
   const navigate = useNavigate()
   const { currentMembership } = useAuth()
-  const { usage, refresh: refreshUsage } = useOrgUsage(currentMembership?.organization.id)
+  const { refresh: refreshUsage } = useOrgUsage(currentMembership?.organization.id)
   const [exam, setExam] = useState<Exam | null>(null)
   const [settings, setSettings] = useState<ExamSettingsRow | null>(null)
   const [approvedCount, setApprovedCount] = useState(0)
@@ -79,9 +79,6 @@ export default function ExamSettings() {
     await refreshUsage()
     navigate(`/quizzes/${examId}`)
   }
-
-  const publishedLimit = usage?.max_published_exams ?? null
-  const atPublishLimit = exam?.status !== 'published' && publishedLimit !== null && (usage?.published_exam_count ?? 0) >= publishedLimit
 
   if (loading || !settings || !exam) return <div className="page"><p>Loading…</p></div>
 
@@ -159,17 +156,11 @@ export default function ExamSettings() {
           />
         </div>
 
-        {atPublishLimit && (
-          <p className="limit-note attn">
-            You've published {usage?.published_exam_count} of {publishedLimit} quizzes allowed on your plan. <Link to="/billing">Upgrade to publish more →</Link>
-          </p>
-        )}
-
         {error && <p className="form-error">{error}</p>}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
           <button type="submit" className="secondary" disabled={saving}>Save settings</button>
-          <button type="button" onClick={publish} disabled={saving || !gateClear || exam.status === 'published' || atPublishLimit}>
+          <button type="button" onClick={publish} disabled={saving || !gateClear || exam.status === 'published'}>
             {exam.status === 'published' ? 'Published' : 'Publish quiz'}
           </button>
         </div>

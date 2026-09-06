@@ -1,3 +1,4 @@
+import BrandLogo from '../../components/BrandLogo'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -60,12 +61,11 @@ export default function Signup() {
       </div>
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}>
         <div className="auth-logo">
-          <span className="logo-mark">H</span>
-          HQ<span>360</span>
+          <BrandLogo size={30} tagline />
         </div>
         <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Create your office</h1>
-        <p className="auth-subtitle">Set up HQ360 for your team in a couple of minutes.</p>
+        <p className="auth-subtitle">Set up Bizzlivo for your team in a couple of minutes.</p>
 
         <label>
           Your full name

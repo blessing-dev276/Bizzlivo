@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { PLAN_COPY, trialDaysLeft, useOrgUsage } from '../../lib/plans'
+import { trialDaysLeft, useOrgUsage } from '../../lib/plans'
+import { PLAN_META } from '../../lib/entitlements'
 
 export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: string | undefined; canManageBilling: boolean }) {
   const { usage } = useOrgUsage(orgId)
@@ -8,7 +9,7 @@ export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: st
   const planLabel = usage
     ? usage.status === 'trialing' && daysLeft !== null
       ? `Growth trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
-      : PLAN_COPY[usage.plan].label
+      : PLAN_META[usage.plan].label
     : '—'
 
   return (
@@ -16,7 +17,7 @@ export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: st
       <div className="wf-card">
         <p className="wf-quote">
           "Invest in people. Everything else follows."
-          <cite>The HQ360 way</cite>
+          <cite>The Bizzlivo way</cite>
         </p>
       </div>
 

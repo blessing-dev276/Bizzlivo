@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
+import { useOrgUsage } from '../../lib/plans'
 
 function initials(name: string | undefined | null) {
   if (!name) return '?'
@@ -8,16 +10,20 @@ function initials(name: string | undefined | null) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || name[0].toUpperCase()
 }
 
-// Admin-only. The office name + logo shown across the app (sidebar brand,
-// mobile bar, office switcher). Logo is a hosted image URL rather than an
-// upload — there's no org-logo storage bucket, and logo_url is just a text
-// column consumed directly as an <img src>.
+const HEX_RE = /^#([0-9a-f]{6})$/i
+
+// Admin-only. Office name is free on every plan. Custom logo + brand colour
+// are the `custom_branding` entitlement (Business) — gated here in the UI;
+// the columns simply stay unset for lower plans.
 export default function OfficeSettings() {
   const { currentMembership, refresh } = useAuth()
   const org = currentMembership?.organization
+  const { usage } = useOrgUsage(org?.id)
+  const canBrand = !!usage?.custom_branding
 
   const [name, setName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [brandColor, setBrandColor] = useState('')
   const [imgFailed, setImgFailed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,6 +33,7 @@ export default function OfficeSettings() {
     if (!org) return
     setName(org.name ?? '')
     setLogoUrl(org.logo_url ?? '')
+    setBrandColor(org.brand_color ?? '')
   }, [org])
 
   useEffect(() => {
@@ -42,14 +49,20 @@ export default function OfficeSettings() {
       setError('Office name is required.')
       return
     }
+    if (canBrand && brandColor && !HEX_RE.test(brandColor)) {
+      setError('Brand colour must be a hex value like #2563eb.')
+      return
+    }
     setError(null)
     setNotice(null)
     setSaving(true)
     try {
-      const { error: updateErr } = await supabase
-        .from('organizations')
-        .update({ name: name.trim(), logo_url: logoUrl.trim() || null })
-        .eq('id', org.id)
+      const patch: Record<string, unknown> = { name: name.trim() }
+      if (canBrand) {
+        patch.logo_url = logoUrl.trim() || null
+        patch.brand_color = brandColor.trim() || null
+      }
+      const { error: updateErr } = await supabase.from('organizations').update(patch).eq('id', org.id)
       if (updateErr) throw updateErr
       setNotice('Office updated.')
       await refresh()
@@ -60,13 +73,13 @@ export default function OfficeSettings() {
     }
   }
 
-  const showLogo = logoUrl.trim() && !imgFailed
+  const showLogo = canBrand && logoUrl.trim() && !imgFailed
 
   return (
     <div>
       <div className="page-head">
         <h1>Office</h1>
-        <p>Your office name and logo, shown across the workspace.</p>
+        <p>Your office name{canBrand ? ', logo and brand colour' : ''}, shown across the workspace.</p>
       </div>
 
       {error && <p className="form-error">{error}</p>}
@@ -86,9 +99,11 @@ export default function OfficeSettings() {
             {initials(name || org.name)}
           </div>
         )}
-        <p style={{ color: 'var(--text-faint)', fontSize: 12.5 }}>
-          Preview. Paste a hosted image link below (square works best).
-        </p>
+        {canBrand && (
+          <p style={{ color: 'var(--text-faint)', fontSize: 12.5 }}>
+            Preview. Paste a hosted image link below (square works best).
+          </p>
+        )}
       </div>
 
       <form onSubmit={handleSave} style={{ maxWidth: 480 }}>
@@ -97,15 +112,47 @@ export default function OfficeSettings() {
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
 
-        <label>
-          Logo URL
-          <input
-            type="url"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://…/logo.png"
-          />
-        </label>
+        {canBrand ? (
+          <>
+            <label>
+              Logo URL
+              <input
+                type="url"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://…/logo.png"
+              />
+            </label>
+            <label>
+              Brand colour
+              <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input
+                  type="color"
+                  value={HEX_RE.test(brandColor) ? brandColor : '#2563eb'}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  style={{ width: 44, height: 34, padding: 2, borderRadius: 8 }}
+                />
+                <input
+                  value={brandColor}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  placeholder="#2563eb"
+                  style={{ flex: 1 }}
+                />
+                {brandColor && (
+                  <button type="button" className="btn-ghost" onClick={() => setBrandColor('')}>Reset</button>
+                )}
+              </span>
+            </label>
+          </>
+        ) : (
+          <div className="entitlement-lock">
+            <div>
+              <strong>Custom logo &amp; brand colour</strong>
+              <p>Available on the Business plan — replace the Bizzlivo mark with your own across the workspace.</p>
+            </div>
+            <Link to="/billing" className="btn-primary-link">Upgrade</Link>
+          </div>
+        )}
 
         <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
       </form>

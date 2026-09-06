@@ -1,5 +1,5 @@
 /* ============================================================
-   HQ360 design system
+   Bizzlivo design system
    Dark is the default (:root); :root[data-theme="light"] overrides.
    Theme is toggled explicitly (see ThemeContext) and mirrored onto
    <html data-theme="..."> — see the inline script in index.html that
@@ -321,7 +321,7 @@ label {
   color: var(--gold-ink);
   flex-shrink: 0;
 }
-/* Office-branded logo (replaces the HQ360 wordmark in the sidebar / mobile bar) */
+/* Office-branded logo (replaces the Bizzlivo wordmark in the sidebar / mobile bar) */
 .office-logo-img {
   width: 28px;
   height: 28px;
@@ -1862,46 +1862,125 @@ td {
 .badge.trialing { color: var(--gold); border-color: var(--gold); background: var(--gold-soft); }
 .badge.past_due, .badge.canceled, .badge.expired { color: var(--danger); border-color: var(--danger); background: var(--coral-soft); }
 
+/* ============================================================
+   BILLING & PLAN — premium SaaS pricing surface
+   ============================================================ */
+.billing .page-head h1 { letter-spacing: -0.02em; }
+
 .billing-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;
+  background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;
 }
 .billing-banner.warn { background: var(--coral-soft); border-color: var(--danger); }
 .billing-banner p { margin: 0; font-size: 13.5px; color: var(--text-h); }
 .billing-banner strong { color: inherit; }
 
-.usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 20px 0 32px; }
-.usage-meter { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-.usage-meter .um-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-.usage-meter .um-label { font-size: 12.5px; color: var(--text-dim); }
-.usage-meter .um-count { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-h); font-variant-numeric: tabular-nums; }
+/* --- current plan + usage --- */
+.billing-status-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; margin: 4px 0 30px; }
+.billing-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+.bp-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+}
+.bp-plan-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; }
+.bp-plan-name { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--text-h); letter-spacing: -0.01em; }
+.bp-plan-name.plan-growth { color: var(--accent); }
+.bp-plan-name.plan-business { color: var(--gold); }
+.bp-org { margin: 0 0 14px; font-size: 13px; color: var(--text-dim); }
+.bp-facts { display: flex; flex-wrap: wrap; gap: 22px 30px; margin: 0 0 16px; }
+.bp-facts div { display: flex; flex-direction: column; gap: 3px; }
+.bp-facts dt { font-size: 11px; color: var(--text-faint); }
+.bp-facts dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-h); }
+.bp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bp-seat-note { margin: 14px 0 0; font-size: 12.5px; color: var(--text-dim); }
+.bp-seat-note.at { color: var(--danger); font-weight: 600; }
+
+.usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 12px 0 0; }
+.usage-meter { background: var(--panel-hi); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.usage-meter .um-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.usage-meter .um-label { font-size: 12px; color: var(--text-dim); }
+.usage-meter .um-count { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-h); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.usage-meter .um-count.near { color: var(--gold); }
+.usage-meter .um-count.at { color: var(--danger); }
 .usage-bar { height: 6px; border-radius: 4px; background: var(--line-soft); overflow: hidden; }
-.usage-bar-fill { height: 100%; border-radius: 4px; background: var(--teal); transition: width 0.2s; }
+.usage-bar-fill { height: 100%; border-radius: 4px; background: var(--teal); transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.usage-bar-fill.near { background: var(--gold); }
 .usage-bar-fill.attn { background: var(--coral); }
 
-.cycle-toggle { display: inline-flex; background: var(--line-soft); border: 1px solid var(--line); border-radius: 100px; padding: 3px; gap: 2px; }
-.cycle-toggle button { background: transparent; color: var(--text-dim); font-size: 13px; padding: 7px 18px; border-radius: 100px; font-weight: 500; }
-.cycle-toggle button:hover:not(:disabled) { filter: none; }
-.cycle-toggle button.active { background: var(--accent); color: var(--gold-ink); }
-.save-pill { font-family: var(--font-mono); font-size: 11px; color: var(--teal); border: 1px solid var(--teal); border-radius: 100px; padding: 2px 10px; }
-
-.plan-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 20px 0; }
-.plan-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px; position: relative; }
-.plan-card.current { border-color: var(--teal); }
-.plan-card .pc-current-flag {
-  position: absolute; top: -11px; left: 20px; background: var(--teal); color: var(--gold-ink);
-  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 100px;
+/* --- monthly / yearly --- */
+.billing-cycle-row { display: flex; justify-content: center; margin: 6px 0 20px; scroll-margin-top: 20px; }
+.cycle-toggle { display: inline-flex; background: var(--line-soft); border: 1px solid var(--line); border-radius: 100px; padding: 4px; gap: 2px; }
+.cycle-toggle button {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; color: var(--text-dim); font-size: 13px; padding: 8px 20px; border-radius: 100px; font-weight: 600;
 }
-.plan-card h3 { font-size: 16px; margin: 4px 0 0; }
-.plan-card .pc-who { font-size: 12px; color: var(--text-dim); margin: 0; min-height: 30px; }
-.plan-card .pc-price { display: flex; align-items: baseline; gap: 6px; }
-.plan-card .pc-price .amt { font-family: var(--font-display); font-size: 26px; color: var(--text-h); }
-.plan-card .pc-price .per { font-size: 12px; color: var(--text-dim); }
-.plan-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.plan-card li { font-size: 13px; color: var(--text-dim); display: flex; gap: 8px; align-items: flex-start; }
-.plan-card li::before { content: "✓"; color: var(--teal); font-weight: 700; flex-shrink: 0; }
+.cycle-toggle button:hover:not(:disabled) { color: var(--text-h); filter: none; }
+.cycle-toggle button.active { background: var(--accent); color: var(--gold-ink); }
+.cycle-save {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.03em; text-transform: uppercase;
+  background: color-mix(in srgb, var(--teal) 22%, transparent); color: var(--teal);
+  border-radius: 100px; padding: 2px 8px;
+}
+.cycle-toggle button.active .cycle-save { background: rgba(0, 0, 0, 0.18); color: var(--gold-ink); }
 
-.payment-history-empty { color: var(--text-dim); font-size: 13.5px; }
+/* --- plan cards --- */
+.plan-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 8px 0 40px; align-items: stretch; }
+.plan-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 24px 22px 22px; display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.plan-card.recommended { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), 0 24px 60px -34px color-mix(in srgb, var(--accent) 45%, #000); }
+.plan-card.current { border-color: var(--teal); }
+.pc-flag {
+  position: absolute; top: -10px; left: 22px; font-family: var(--font-mono); font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 10px; border-radius: 100px; font-weight: 700;
+}
+.pc-flag.popular { background: var(--accent); color: var(--gold-ink); }
+.pc-flag.current { background: var(--teal); color: var(--gold-ink); left: auto; right: 22px; }
+.pc-name { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 2px 0 0; color: var(--text-h); }
+.pc-name.plan-growth { color: var(--accent); }
+.pc-name.plan-business { color: var(--gold); }
+.pc-tagline { font-size: 12px; color: var(--text-dim); margin: 0 0 6px; min-height: 32px; line-height: 1.4; }
+.pc-price { display: flex; align-items: baseline; gap: 5px; margin-top: 4px; }
+.pc-price .pc-amt { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text-h); letter-spacing: -0.02em; }
+.pc-price .pc-per { font-size: 12.5px; color: var(--text-dim); }
+.pc-price-sub { font-size: 11.5px; color: var(--text-faint); margin: 3px 0 0; min-height: 16px; }
+.pc-price-sub strong { color: var(--teal); }
+.pc-members { font-size: 12.5px; font-weight: 600; color: var(--text); margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.pc-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.pc-features li { font-size: 12.5px; color: var(--text-dim); display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; }
+.pc-features li::before { content: "✓"; color: var(--teal); font-weight: 700; flex-shrink: 0; }
+.pc-cta { margin-top: 18px; }
+.pc-cta button { width: 100%; }
+.plan-card.recommended .pc-cta button:not(.secondary):not(:disabled) { background: var(--accent); }
+
+/* --- comparison table --- */
+.compare-plans { margin: 8px 0 40px; }
+.compare-plans h2 { font-size: 16px; margin: 0 0 14px; letter-spacing: -0.01em; }
+.compare-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 14px; }
+.compare-table { width: 100%; border-collapse: collapse; min-width: 520px; font-size: 13px; }
+.compare-table th, .compare-table td { padding: 12px 16px; text-align: center; border-bottom: 1px solid var(--line-soft); }
+.compare-table thead th { font-family: var(--font-display); font-size: 13px; color: var(--text-h); background: var(--panel-hi); position: sticky; top: 0; }
+.compare-table thead th.is-current { color: var(--teal); }
+.compare-table tbody th[scope="row"] { text-align: left; font-weight: 500; color: var(--text); white-space: nowrap; }
+.compare-table td { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.compare-table td.is-current { background: color-mix(in srgb, var(--teal) 8%, transparent); color: var(--text-h); }
+.compare-table td.muted { color: var(--text-faint); }
+.compare-table tbody tr:last-child th, .compare-table tbody tr:last-child td { border-bottom: none; }
+
+.billing-history { margin-top: 8px; }
+.billing-history h2 { font-size: 16px; margin: 0 0 14px; }
+
+@media (max-width: 900px) {
+  .billing-status-grid { grid-template-columns: 1fr; }
+  .plan-cards { grid-template-columns: 1fr; gap: 14px; }
+  /* mobile ordering: current plan first, then Growth, then the rest */
+  .plan-card { order: var(--m-order, 0); }
+}
+@media (max-width: 560px) {
+  .bp-facts { gap: 16px 24px; }
+  .pc-price .pc-amt { font-size: 28px; }
+  .plan-card { padding: 22px 18px 20px; }
+}
 
 /* ============================================================
    Sidebar — grouped nav (member view), collapse toggle, log-out button
@@ -2458,7 +2537,7 @@ td {
 .oo-cell .v { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--text); }
 .oo-cell .l { font-size: 10.5px; color: var(--text-dim); }
 
-/* HQ360 intelligence */
+/* Bizzlivo intelligence */
 .intel-list { display: flex; flex-direction: column; gap: 11px; }
 .intel-row { display: flex; gap: 10px; align-items: flex-start; }
 .intel-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; background: var(--_t, var(--tint-primary)); }
@@ -4059,4 +4138,22 @@ td {
   .gl-row-prog { display: none; }
   .gl-drawer { width: 100%; }
   .gl-summary { gap: 16px; }
+}
+
+/* ============================================================
+   Bizzlivo brand lockup — src/components/BrandLogo.tsx
+   ============================================================ */
+.bl { display: inline-flex; align-items: center; }
+.bl-stack { flex-direction: column; align-items: center; gap: 5px; }
+.bl-row { display: inline-flex; align-items: center; gap: 9px; }
+.bl-mark { flex-shrink: 0; filter: drop-shadow(0 0 10px rgba(23, 195, 201, 0.35)); }
+.bl-word {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-weight: 700; letter-spacing: -0.02em; line-height: 1;
+  color: currentColor;
+}
+.bl-tag {
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+  font-size: 10px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-faint);
 }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ThemeToggle from '../../components/ThemeToggle'
+import BrandLogo from '../../components/BrandLogo'
 
-/* HQ360 marketing landing — shown at the root of the main domain to
+/* Bizzlivo marketing landing — shown at the root of the main domain to
    logged-out visitors, before Create an office / Log in. Pure CSS + inline
    SVG (no external assets), theme-aware, responsive. */
 
@@ -60,9 +61,9 @@ const PLANS = [
 ]
 
 const FAQS = [
-  { q: 'What is HQ360 for?', a: 'HQ360 is an operating system for network-marketing and training organizations — onboarding, learning, ranks, assessments, events, income and reporting in one multi-tenant platform.' },
+  { q: 'What is Bizzlivo for?', a: 'Bizzlivo is an operating system for network-marketing and training organizations — onboarding, learning, ranks, assessments, events, income and reporting in one multi-tenant platform.' },
   { q: 'Is my office data isolated from others?', a: 'Yes. Every office is a separate organization enforced by Postgres row-level security. No one from another office can ever see your people, learning or finances.' },
-  { q: 'Do I need to install anything?', a: 'No. HQ360 runs in the browser. Create an office and share your login link — members just sign in.' },
+  { q: 'Do I need to install anything?', a: 'No. Bizzlivo runs in the browser. Create an office and share your login link — members just sign in.' },
   { q: 'Can I use my own branding?', a: 'Each office has its own name, colors, logo and a branded login page on its own subdomain.' },
 ]
 
@@ -106,7 +107,7 @@ export default function Landing() {
       <header className={`lp-nav ${scrolled ? 'lp-nav-solid' : ''}`}>
         <div className="lp-shell lp-nav-inner">
           <a href="#top" className="lp-logo">
-            <span className="lp-logo-mark">H</span>HQ<span>360</span>
+            <BrandLogo size={22} />
           </a>
           <nav className={`lp-links ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(false)}>
             <a href="#product">Product</a>
@@ -161,7 +162,7 @@ export default function Landing() {
           <div className="lp-section-head" data-reveal>
             <span className="lp-kicker">Everything in one place</span>
             <h2>Built for how your office actually runs</h2>
-            <p>From a new member&rsquo;s first day to their first payout — every step lives in HQ360.</p>
+            <p>From a new member&rsquo;s first day to their first payout — every step lives in Bizzlivo.</p>
           </div>
           <div className="lp-grid">
             {FEATURES.map((f, i) => (
@@ -255,9 +256,9 @@ export default function Landing() {
 
       <footer className="lp-footer lp-shell">
         <div className="lp-logo">
-          <span className="lp-logo-mark">H</span>HQ<span>360</span>
+          <BrandLogo size={20} />
         </div>
-        <p>© {new Date().getFullYear()} HQ360. Multi-tenant office management, learning and member development.</p>
+        <p>© {new Date().getFullYear()} Bizzlivo. Multi-tenant office management, learning and member development.</p>
         <div className="lp-footer-links">
           <Link to="/login">Log in</Link>
           <Link to="/signup">Create office</Link>
@@ -276,7 +277,7 @@ function ProductMock() {
     <div className="lp-mock">
       <div className="lp-mock-bar">
         <span /><span /><span />
-        <div className="lp-mock-url">app.hq360.space</div>
+        <div className="lp-mock-url">bizzlivo.com</div>
       </div>
       <div className="lp-mock-body">
         <aside className="lp-mock-side">

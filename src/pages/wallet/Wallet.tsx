@@ -420,7 +420,7 @@ function PersonalIncome({
   return (
     <div style={{ marginTop: 12 }}>
       <p className="md-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        This is for your own tracking only. It does <strong>not</strong> affect your HQ360 withdrawable balance.
+        This is for your own tracking only. It does <strong>not</strong> affect your Bizzlivo withdrawable balance.
       </p>
       <form onSubmit={add} className="upload-panel" style={{ marginBottom: 16 }}>
         <div className="field-row">

@@ -1,7 +1,7 @@
-# HQ360 — Phase 1 Build Spec
+# Bizzlivo — Phase 1 Build Spec
 
 ## What this is
-HQ360 is a multi-tenant CBT/exam platform. Each customer is an "office" (tenant).
+Bizzlivo is a multi-tenant CBT/exam platform. Each customer is an "office" (tenant).
 Office admins upload a skill/service PDF, AI generates an MCQ/True-False exam,
 admin reviews and approves it, configures settings, assigns it to members, and
 members take the exam online with instant auto-grading.

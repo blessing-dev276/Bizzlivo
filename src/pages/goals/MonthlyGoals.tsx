@@ -2,15 +2,20 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import type {
+  GoalAutoSource,
   GoalCategory,
   GoalPriority,
   GoalType,
   MemberMonthlyGoal,
 } from '../../types/database'
 import {
+  AUDIT_ACTION_LABEL,
+  AUTO_SOURCES,
+  AUTO_SOURCE_META,
   CATEGORIES,
   CATEGORY_META,
   GOAL_TYPE_META,
+  LEARNING_AREAS,
   PRIORITY_META,
   STATUS_META,
   actionsFor,
@@ -19,13 +24,16 @@ import {
   formatValue,
   goalPercent,
   goalRpc,
+  loadGoalAudit,
   monthKeyOf,
   monthLabelOf,
   runGoalMaintenance,
   setBinaryDone,
   setProgress,
   updateGoalFields,
+  type GoalAuditRow,
 } from '../../lib/goals'
+import { AREA_LABELS } from '../../lib/reports/types'
 
 type PlanTab = 'monthly' | 'quarter'
 
@@ -203,6 +211,7 @@ function GoalRow({ goal, onOpen }: { goal: MemberMonthlyGoal; onOpen: () => void
         </span>
         <span className="gl-row-sub">
           {cat?.label ?? 'Uncategorised'}
+          {goal.auto_source && ' · Auto-tracked'}
           {goal.due_date && ` · Due ${new Date(goal.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
         </span>
       </span>
@@ -242,13 +251,15 @@ function GoalDrawer({
   const [note, setNote] = useState('')
   const [evidence, setEvidence] = useState('')
   const [showSubmit, setShowSubmit] = useState(false)
+  const [audit, setAudit] = useState<GoalAuditRow[]>([])
 
   useEffect(() => {
     setProgressInput(String(goal.progress_value ?? 0))
     setShowSubmit(false)
     setNote('')
     setEvidence('')
-  }, [goal.id, goal.progress_value])
+    loadGoalAudit(goal.id).then(setAudit)
+  }, [goal.id, goal.progress_value, goal.status, goal.updated_at])
 
   async function run(fn: () => PromiseLike<{ error: { message: string } | null }>) {
     setBusy(true)
@@ -279,6 +290,12 @@ function GoalDrawer({
 
         <div className="gl-drawer-sec">
           <h4>Progress</h4>
+          {goal.auto_source && (
+            <p className="gl-sub-note" style={{ marginBottom: 8 }}>
+              ⚡ Tracked automatically — {AUTO_SOURCE_META[goal.auto_source].label}
+              {goal.auto_source === 'learning_modules' && goal.auto_area ? ` (${AREA_LABELS[goal.auto_area] ?? goal.auto_area})` : ''}
+            </p>
+          )}
           {goal.goal_type === 'binary' ? (
             <button
               type="button"
@@ -330,6 +347,20 @@ function GoalDrawer({
             <p className="gl-sub-note"><a href={goal.evidence_url} target="_blank" rel="noreferrer">Evidence link ↗</a></p>
           )}
         </div>
+
+        {audit.length > 0 && (
+          <div className="gl-drawer-sec">
+            <h4>Activity</h4>
+            <ul className="gl-timeline">
+              {audit.map((e) => (
+                <li key={e.id}>
+                  <span>{AUDIT_ACTION_LABEL[e.action] ?? e.action.replace('goal.', '')}</span>
+                  <strong>{new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="gl-drawer-actions">
           {a.canSubmit && !showSubmit && (
@@ -389,35 +420,45 @@ function GoalFormModal({
   const [targetValue, setTargetValue] = useState(existing?.target_value != null ? String(existing.target_value) : '')
   const [priority, setPriority] = useState<GoalPriority>(existing?.priority ?? 'normal')
   const [dueDate, setDueDate] = useState(existing?.due_date ?? '')
+  const [autoSource, setAutoSource] = useState<GoalAutoSource | ''>(existing?.auto_source ?? '')
+  const [autoArea, setAutoArea] = useState(existing?.auto_area ?? 'network_marketing')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const effectiveType: GoalType = autoSource ? AUTO_SOURCE_META[autoSource].goalType : goalType
 
   async function save(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
     setBusy(true)
     setErr(null)
-    const tv = goalType === 'binary' ? null : (targetValue ? Number(targetValue) : null)
+    const tv = effectiveType === 'binary' ? null : (targetValue ? Number(targetValue) : null)
+    const src = autoSource || null
+    const area = src === 'learning_modules' ? autoArea : null
     let error: { message: string } | null = null
     if (existing) {
       const r = await updateGoalFields(existing.id, {
         title: title.trim(),
         description: description.trim() || null,
         category: category || null,
-        goal_type: goalType,
+        goal_type: effectiveType,
         unit: unit.trim() || null,
         metric: unit.trim() || null,
         target_value: tv,
         target: tv != null ? Math.round(tv) : null,
         priority,
         due_date: dueDate || null,
+        progress_mode: src ? 'auto' : 'manual',
+        auto_source: src,
+        auto_area: area,
       })
       error = r.error
     } else {
       const r = await createGoal(orgId, userId, {
-        title, description, category: category || null, goal_type: goalType, unit,
+        title, description, category: category || null, goal_type: effectiveType, unit,
         target_value: tv, priority, due_date: dueDate || null,
         period_type: periodType, month,
+        auto_source: src, auto_area: area,
       })
       error = r.error
     }
@@ -446,18 +487,33 @@ function GoalFormModal({
               </select>
             </label>
           </div>
-          <div className="gl-form-row">
-            <label>Type
-              <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)}>
-                {(Object.keys(GOAL_TYPE_META) as GoalType[]).map((t) => <option key={t} value={t}>{GOAL_TYPE_META[t].label}</option>)}
+          <label>Track progress
+            <select value={autoSource} onChange={(e) => setAutoSource(e.target.value as GoalAutoSource | '')}>
+              <option value="">Manually — I'll update it</option>
+              {AUTO_SOURCES.map((s) => <option key={s} value={s}>Automatically — {AUTO_SOURCE_META[s].label}</option>)}
+            </select>
+          </label>
+          {autoSource === 'learning_modules' && (
+            <label>Learning area
+              <select value={autoArea} onChange={(e) => setAutoArea(e.target.value)}>
+                {LEARNING_AREAS.map((ar) => <option key={ar} value={ar}>{AREA_LABELS[ar] ?? ar}</option>)}
               </select>
             </label>
-            {goalType !== 'binary' && (
+          )}
+          <div className="gl-form-row">
+            {!autoSource && (
+              <label>Type
+                <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)}>
+                  {(Object.keys(GOAL_TYPE_META) as GoalType[]).map((t) => <option key={t} value={t}>{GOAL_TYPE_META[t].label}</option>)}
+                </select>
+              </label>
+            )}
+            {effectiveType !== 'binary' && (
               <label>Target
                 <input type="number" min="0" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} required />
               </label>
             )}
-            {goalType === 'number' && (
+            {effectiveType === 'number' && !autoSource && (
               <label>Unit<input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="prospects" /></label>
             )}
           </div>

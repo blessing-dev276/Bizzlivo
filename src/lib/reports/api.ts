@@ -22,6 +22,7 @@ export interface FinanceOrgOverview {
 }
 import type {
   BusinessPathReport,
+  GoalsReport,
   IncomeReport,
   LearningReport,
   MemberReport,
@@ -58,6 +59,8 @@ export const reportsApi = {
     call<TeamsReport>('report_teams', { p_org: org, ...win(range) }),
   income: (org: string, range: ResolvedRange) =>
     call<IncomeReport>('report_income', { p_org: org, ...win(range) }),
+  goals: (org: string, range: ResolvedRange) =>
+    call<GoalsReport>('report_goals', { p_org: org, ...win(range) }),
   finance: (org: string, range: ResolvedRange) =>
     call<FinanceOrgOverview>('finance_org_overview', { p_org: org, ...win(range) }),
   member: (org: string, userId: string) =>

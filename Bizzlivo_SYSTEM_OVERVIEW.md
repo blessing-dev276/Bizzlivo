@@ -1,12 +1,12 @@
-# HQ360 — Complete Current System Overview
+# Bizzlivo — Complete Current System Overview
 
-> **Purpose:** Give this entire file to ChatGPT or another developer before asking it to work on HQ360. It describes the system as it exists in the current working tree, including its architecture, user roles, workflows, data model, security rules, integrations, deployment model, and known gaps.
+> **Purpose:** Give this entire file to ChatGPT or another developer before asking it to work on Bizzlivo. It describes the system as it exists in the current working tree, including its architecture, user roles, workflows, data model, security rules, integrations, deployment model, and known gaps.
 >
 > **Snapshot date:** 6 September 2026. The application is evolving. When this document and the source disagree, the source code and newest numbered database migration are authoritative.
 
 ## 1. Product summary
 
-HQ360 is a multi-tenant office management, learning, assessment, and member-development platform. Each office is an isolated organization with its own branding, people, teams, learning material, exams, assignments, events, performance data, and subscription.
+Bizzlivo is a multi-tenant office management, learning, assessment, and member-development platform. Each office is an isolated organization with its own branding, people, teams, learning material, exams, assignments, events, performance data, and subscription.
 
 The original product was a computer-based testing (CBT) platform: an administrator uploads a PDF, AI creates questions, staff review them, an exam is published and assigned, and members take it online. The current product has expanded into an operating system for a network-marketing/training organization. It now covers:
 
@@ -20,7 +20,7 @@ The original product was a computer-based testing (CBT) platform: an administrat
 - Admin dashboards, analytics, exam rosters, attempt details, and team performance.
 - Free/Growth/Business subscription plans with Paystack checkout.
 
-HQ360 is a client-rendered React application backed by Supabase. Most data access goes directly from the browser to Supabase and is secured with Postgres Row Level Security (RLS). Privileged or anonymous workflows use Supabase Edge Functions.
+Bizzlivo is a client-rendered React application backed by Supabase. Most data access goes directly from the browser to Supabase and is secured with Postgres Row Level Security (RLS). Privileged or anonymous workflows use Supabase Edge Functions.
 
 ## 2. Architecture at a glance
 
@@ -392,7 +392,13 @@ Goals is a member planning + review workspace, all on **one table, `member_month
 
 **Notifications:** `goal_submitted` (→ admins), `goal_approved` / `goal_changes_requested` / `goal_rejected` / `goal_month_closed` (→ member), `goal_setup_reminder`. Deduped by `type` + `payload->>'period'` (checked before insert).
 
-**Admin review:** `/goals/review` (admin + team_leader) — a submission queue (approve / request changes / reject + note in a drawer) and an all-goals table filtered by period/status. Deferred to a follow-up: the Reports & Insights Goals tab, admin/member dashboard "needs attention" cards, org goal templates/settings, and an audit-history UI.
+**Admin review:** `/goals/review` (admin + team_leader) — a submission queue (approve / request changes / reject + note in a drawer) and an all-goals table filtered by period/status.
+
+**Reports (`0045`):** a Goals tab in Reports & Insights, fed by `report_goals(p_org, start, end)` — setup rate, missing goals, avg completion, awaiting review, 90-day plans, period submitted/approved/rejected, this-month-by-status, completion-by-category, by-team. `report_bp_item_complete`'s `monthly_goal` branch was aligned to `status='approved'`, and `0045` auto-approved current-month `done` goals once (transparent `review_note`, `reviewed_by` NULL) so no member's Business Path regressed. Goal notifications now carry `{text, link}` payloads so the bell renders them.
+
+**Auto-tracked progress + audit + deadlines (`0046`):** a goal may set `auto_source` (`prospects_added` / `followups_logged` / `income_amount` / `income_entries` / `direct_members` / `daily_reports` / `exams_passed` / `events_attended` / `learning_modules` + `auto_area`) — `goals_sync_auto(p_org)` recomputes those goals' progress from the owning tables on every Goals-page load, and the member can't hand-edit them. A `goal_audit` trigger writes an `audit_log` row on every goal creation / status change (not on progress bumps); a scoped `audit_log` SELECT policy lets the owner / admins / the member's team leader read the goal's history (shown in the drawer's Activity list). `goal_deadline_reminders(p_org)` creates one notification per goal at 7 / 3 / 1 / 0 days before `due_date` (deduped), also lazily on page load. `runGoalMaintenance()` chains close → sync-auto → setup-reminder → deadline-reminders.
+
+Deferred: admin/member dashboard "needs attention" goal cards, org goal templates/settings.
 
 ### Daily reports
 
@@ -457,7 +463,7 @@ Plan definitions are stored in `plan_limits`, making the database the source of 
 | Growth | ₦5,000 | ₦50,000 | 20 | Unlimited | Unlimited | 10 | 150 |
 | Business | ₦12,000 | ₦120,000 | 50 | Unlimited | Unlimited | 25 | 250 |
 
-Business enables custom branding; paid plans remove the public-link HQ360 badge according to stored plan flags.
+Business enables custom branding; paid plans remove the public-link Bizzlivo badge according to stored plan flags.
 
 New offices attempt to receive a 14-day Growth trial. Subscription status is reconciled on later authenticated loads through `sync_subscription_status()` rather than a scheduled job.
 
@@ -557,7 +563,7 @@ Storage uses organization-prefixed paths and matching RLS policies. Resource fil
 
 ## 20. Time-based behavior
 
-HQ360 has no cron jobs or scheduled Edge Functions. Time transitions are handled when a relevant user visits:
+Bizzlivo has no cron jobs or scheduled Edge Functions. Time transitions are handled when a relevant user visits:
 
 - Subscription/trial expiry is synchronized during authenticated data loading.
 - Exam attempts and missed/expired states can be repaired on page load.
@@ -573,7 +579,7 @@ This is acceptable for an MVP where delays are measured in hours or days, but it
 - Types are not currently generated from the database, so schema and TypeScript can drift.
 - Role-aware hub components choose staff or member implementations.
 - Shared helpers cover dates, plans, resource types, tenant hostnames, trainer scope, Business Path (`src/lib/businessPath.ts` — rank/item loading, live completion derivation, `promoteMember`), content completion (`src/lib/taskProgress.ts`), notifications, and exam lifecycle.
-- The CSS system supports dark and light themes, responsive layouts, status badges, modals, drawers, tables, exam cards, dashboards, and auth screens.
+- The CSS system supports dark and light themes, responsive layouts, status badges, modals, drawers, tables, exam cards, dashboards, and auth screens. **Dark is the primary theme app-wide**: `ThemeContext` / the `index.html` pre-paint script default to dark and ignore the OS `prefers-color-scheme`; light is opt-in via the in-app toggle only (persisted in `localStorage['bizzlivo-theme']`). A `<meta name="theme-color">` is kept in sync with the active theme (`#0a0d12` dark / `#f3f4f6` light) so the mobile status bar and desktop browser/PWA chrome match; `:root` also sets `color-scheme` per theme for native controls and scrollbars.
 - The app becomes a slide-in mobile navigation layout below its responsive sidebar breakpoint.
 
 ## 22. Deployment and operations
@@ -636,7 +642,7 @@ Firebase Hosting remains configured in `firebase.json` with the same SPA rewrite
 
 ## 24. How ChatGPT should work with this repository
 
-When modifying HQ360:
+When modifying Bizzlivo:
 
 1. Read this file, then inspect the exact route/page, its types, and all migrations touching its tables.
 2. Treat the newest migration as the final database definition; older migrations show history, not necessarily current policy behavior.
@@ -654,7 +660,7 @@ When modifying HQ360:
 An office's typical lifecycle is:
 
 1. An admin signs up and creates an office.
-2. HQ360 creates the organization, profile, admin membership, slug, and trial.
+2. Bizzlivo creates the organization, profile, admin membership, slug, and trial.
 3. The admin customizes office settings and shares the branded office URL.
 4. Prospective members request access or receive invitation links.
 5. The admin approves them and organizes them into teams with leaders.
@@ -667,4 +673,4 @@ An office's typical lifecycle is:
 12. Staff reviews performance, submissions, pending members, and office activity.
 13. Plan limits control scale and AI usage; Paystack upgrades the office for a paid period.
 
-That sequence is the clearest mental model for the current HQ360 system: one tenant-aware platform that moves a person from joining an office, through learning and daily execution, into measurable business and team growth.
+That sequence is the clearest mental model for the current Bizzlivo system: one tenant-aware platform that moves a person from joining an office, through learning and daily execution, into measurable business and team growth.

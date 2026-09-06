@@ -3,6 +3,7 @@
 // One table (member_monthly_goals) behind it all; see 0044_goals_v2.sql.
 import { supabase } from '../supabase'
 import type {
+  GoalAutoSource,
   GoalCategory,
   GoalPriority,
   GoalStatus,
@@ -46,6 +47,22 @@ export const GOAL_TYPE_META: Record<GoalType, { label: string }> = {
   percent: { label: 'A percentage' },
 }
 
+// Auto-progress sources — a goal set to one of these pulls its progress
+// live from the owning system (server-side, see goals_sync_auto in 0046).
+export const AUTO_SOURCE_META: Record<GoalAutoSource, { label: string; goalType: GoalType }> = {
+  prospects_added: { label: 'Prospects added this period', goalType: 'number' },
+  followups_logged: { label: 'Follow-ups logged this period', goalType: 'number' },
+  income_amount: { label: 'Income logged this period (₦)', goalType: 'currency' },
+  income_entries: { label: 'Income entries this period', goalType: 'number' },
+  direct_members: { label: 'Direct members sponsored', goalType: 'number' },
+  daily_reports: { label: 'Daily reports filed this period', goalType: 'number' },
+  exams_passed: { label: 'Exams passed this period', goalType: 'number' },
+  events_attended: { label: 'Events attended this period', goalType: 'number' },
+  learning_modules: { label: 'Learning modules completed', goalType: 'number' },
+}
+export const AUTO_SOURCES = Object.keys(AUTO_SOURCE_META) as GoalAutoSource[]
+export const LEARNING_AREAS = ['onboarding', 'network_marketing', 'freelancing', 'personal_development', 'income_development']
+
 export function formatValue(type: GoalType, value: number | null, unit?: string | null): string {
   if (value == null) return '—'
   if (type === 'currency') return `₦${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
@@ -79,7 +96,7 @@ export function actionsFor(g: MemberMonthlyGoal): GoalActions {
   return {
     canEdit: open,
     canDelete: g.status === 'draft',
-    canUpdateProgress: open,
+    canUpdateProgress: open && !g.auto_source,
     canSubmit: open && targetMet(g),
     canWithdraw: g.status === 'submitted',
     canCarryForward: g.status === 'month_closed_incomplete' || g.status === 'rejected' || g.status === 'changes_requested',
@@ -120,6 +137,8 @@ export interface NewGoalInput {
   due_date: string | null
   period_type: 'monthly' | 'quarter'
   month: string
+  auto_source?: GoalAutoSource | null
+  auto_area?: string | null
   as_draft?: boolean
 }
 
@@ -145,6 +164,9 @@ export async function createGoal(orgId: string, userId: string, input: NewGoalIn
     period_type: input.period_type,
     period_start: b.start,
     period_end: b.end,
+    progress_mode: input.auto_source ? 'auto' : 'manual',
+    auto_source: input.auto_source ?? null,
+    auto_area: input.auto_source === 'learning_modules' ? (input.auto_area ?? null) : null,
   })
 }
 
@@ -181,13 +203,44 @@ export const goalRpc = {
   carryForward: (goalId: string) => supabase.rpc('goal_carry_forward', { p_goal: goalId }),
   closeMonth: (orgId: string) => supabase.rpc('close_month_goals', { p_org: orgId }),
   setupReminder: (orgId: string) => supabase.rpc('goal_setup_reminder', { p_org: orgId }),
+  syncAuto: (orgId: string) => supabase.rpc('goals_sync_auto', { p_org: orgId }),
+  deadlineReminders: (orgId: string) => supabase.rpc('goal_deadline_reminders', { p_org: orgId }),
+}
+
+export interface GoalAuditRow {
+  id: string
+  action: string
+  actor_id: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+export async function loadGoalAudit(goalId: string): Promise<GoalAuditRow[]> {
+  const { data } = await supabase
+    .from('audit_log')
+    .select('id, action, actor_id, metadata, created_at')
+    .eq('entity_type', 'goal')
+    .eq('entity_id', goalId)
+    .order('created_at', { ascending: true })
+  return (data as GoalAuditRow[]) ?? []
+}
+export const AUDIT_ACTION_LABEL: Record<string, string> = {
+  'goal.created': 'Goal created',
+  'goal.active': 'Set active',
+  'goal.submitted': 'Submitted for review',
+  'goal.changes_requested': 'Changes requested',
+  'goal.approved': 'Approved',
+  'goal.rejected': 'Rejected',
+  'goal.month_closed_incomplete': 'Month closed — incomplete',
+  'goal.cancelled': 'Cancelled',
 }
 
 // Fire-and-forget lazy maintenance, safe to call on page load.
 export async function runGoalMaintenance(orgId: string) {
   try {
     await goalRpc.closeMonth(orgId)
+    await goalRpc.syncAuto(orgId)
     await goalRpc.setupReminder(orgId)
+    await goalRpc.deadlineReminders(orgId)
   } catch {
     /* non-fatal — the page still renders from whatever state exists */
   }

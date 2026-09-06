@@ -28,7 +28,7 @@ export function untilLabel(iso: string): string {
   return `In ${Math.round(days / 7)} weeks`
 }
 
-const OFFICE_URL_ROOT_DOMAIN = 'hq360.space'
+const OFFICE_URL_ROOT_DOMAIN = 'bizzlivo.com'
 
 export function OfficeLoginLink({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false)

@@ -1,10 +1,10 @@
 // Resolves an office's slug from a wildcard subdomain, e.g.
-// "blaze-office.hq360.space" -> "blaze-office". Requires the DNS/proxy
-// side (wildcard record + Cloudflare Worker in front of Firebase Hosting)
-// to actually route that subdomain here — this just reads whatever
-// hostname the browser already landed on.
-const ROOT_DOMAIN = 'hq360.space'
-const RESERVED_SUBDOMAINS = new Set(['www'])
+// "blaze-office.bizzlivo.com" -> "blaze-office". Requires a wildcard DNS
+// record (*.bizzlivo.com) pointed here for that subdomain to actually
+// route — this just reads whatever hostname the browser already landed on.
+// The bare apex / www serves the marketing + generic login (returns null).
+const ROOT_DOMAIN = 'bizzlivo.com'
+const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'admin', 'api', 'mail', 'staging', 'assets', 'cdn'])
 
 export function getOfficeSlugFromHost(hostname: string): string | null {
   const suffix = `.${ROOT_DOMAIN}`

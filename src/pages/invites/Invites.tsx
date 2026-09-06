@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
+import { useOrgUsage } from '../../lib/plans'
+import { PLAN_META, seatState } from '../../lib/entitlements'
 import type { Invite, MembershipRole, PendingMember, Profile } from '../../types/database'
 
 const INVITE_EXPIRY_DAYS = 7
@@ -71,6 +74,7 @@ function relativeDate(iso: string | null) {
 export default function Invites() {
   const { currentMembership, profile } = useAuth()
   const orgId = currentMembership?.organization.id
+  const { usage } = useOrgUsage(orgId)
   const [members, setMembers] = useState<MemberRow[]>([])
   const [publishedExamCount, setPublishedExamCount] = useState(0)
   const [attemptsByUser, setAttemptsByUser] = useState<Map<string, AttemptRow[]>>(new Map())
@@ -316,12 +320,30 @@ export default function Invites() {
   const pendingInvites = invites.filter((i) => i.status === 'pending')
   const drawerStats = drawerMember ? statsByMember.get(drawerMember.profile.id) : null
 
+  const seats = seatState(usage?.member_count ?? members.length, usage?.max_members ?? null)
+  const planLabel = usage ? PLAN_META[usage.plan].label : ''
+
   return (
     <div className="page">
       <div className="page-head list-header">
         <h1>Members</h1>
-        <button type="button" onClick={() => setShowInviteModal(true)}>+ Invite a member</button>
+        <button type="button" onClick={() => setShowInviteModal(true)} disabled={seats.atLimit}>
+          + Invite a member
+        </button>
       </div>
+
+      {seats.near && seats.max != null && (
+        <div className={`billing-banner ${seats.atLimit ? 'warn' : ''}`} style={{ marginTop: 4 }}>
+          <p>
+            {seats.atLimit ? (
+              <><strong>Member limit reached.</strong> Your {planLabel} plan supports up to {seats.max} members.</>
+            ) : (
+              <>You're using <strong>{seats.used} of {seats.max}</strong> member seats.</>
+            )}
+          </p>
+          <Link to="/billing" className="btn-primary-link">Upgrade</Link>
+        </div>
+      )}
 
       <section className="kpi-strip" style={{ marginTop: 0, marginBottom: 32 }}>
         <div className="kpi">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import ThemeToggle from '../../components/ThemeToggle'
+import BrandLogo from '../../components/BrandLogo'
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/`
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -38,6 +39,8 @@ interface StartResponse {
   exam_title: string
   office_name: string | null
   time_limit_minutes: number
+  removes_badge?: boolean
+  office_logo_url?: string | null
   started_at: string
   questions: PublicQuestion[]
 }
@@ -61,6 +64,7 @@ export default function PublicTakeExam() {
   const [error, setError] = useState<string | null>(null)
   const [examTitle, setExamTitle] = useState('')
   const [officeName, setOfficeName] = useState<string | null>(null)
+  const [hideBadge, setHideBadge] = useState(false)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(0)
 
   const [name, setName] = useState('')
@@ -83,10 +87,11 @@ export default function PublicTakeExam() {
     if (!token) return
     let cancelled = false
     callFunction(`start-attempt?token=${encodeURIComponent(token)}`)
-      .then((data: { exam_title: string; office_name: string | null; time_limit_minutes: number }) => {
+      .then((data: { exam_title: string; office_name: string | null; time_limit_minutes: number; removes_badge?: boolean }) => {
         if (cancelled) return
         setExamTitle(data.exam_title)
         setOfficeName(data.office_name)
+        setHideBadge(!!data.removes_badge)
         setTimeLimitMinutes(data.time_limit_minutes)
         setStage('auth')
       })
@@ -260,14 +265,15 @@ export default function PublicTakeExam() {
         {officeName ? (
           <div className="auth-logo" style={{ flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 22 }}>{officeName}</span>
-            <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
-              powered by HQ360
-            </span>
+            {!hideBadge && (
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+                powered by Bizzlivo
+              </span>
+            )}
           </div>
         ) : (
           <div className="auth-logo">
-            <span className="logo-mark">H</span>
-            HQ<span>360</span>
+            <BrandLogo size={28} />
           </div>
         )}
 

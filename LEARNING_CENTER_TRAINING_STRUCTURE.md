@@ -1,7 +1,7 @@
-# HQ360 — Learning Center / Training Structure & Flow
+# Bizzlivo — Learning Center / Training Structure & Flow
 
 A platform-agnostic spec of how the **Learning Center** and the **Training**
-journey work in HQ360, extracted from the running codebase (React + Supabase).
+journey work in Bizzlivo, extracted from the running codebase (React + Supabase).
 Use it to rebuild the same structure elsewhere.
 
 > Everything is **multi-tenant**: every table is scoped by `org_id`
@@ -91,7 +91,7 @@ Four roles: `admin`, `trainer`, `team_leader`, `member`
 | Network Marketing | `admin` (products/basics) · pipeline is per-member | `member` |
 | Tasks | `admin`, `trainer`, `team_leader` | `member` |
 
-"Manage" access must be enforced **server-side** (HQ360 uses Postgres RLS).
+"Manage" access must be enforced **server-side** (Bizzlivo uses Postgres RLS).
 A manager building a Skill Development class also needs write access to
 `resources`, `coursework_assignments`, and `coursework_targets`, because the
 class editor creates those inline.
@@ -483,7 +483,7 @@ network_marketing_activities             -- timeline log per contact
 
 Admin curates Products + Basics; each member manages their own contacts and
 logs activities as contacts move through the stages. A "distributor" here is a
-CRM record, **not** an HQ360 membership.
+CRM record, **not** an Bizzlivo membership.
 
 ---
 
@@ -619,7 +619,7 @@ Day 1  ─done─▶  (wait 24h)  ─▶  Day 2  ─done─▶  (wait 24h)  ─�
    backfill targets for all active members.
 10. **Analytics** is optional/roadmap — safe to defer.
 
-### Gotchas carried over from HQ360
+### Gotchas carried over from Bizzlivo
 
 - Targeting (assignments, class assignment-items, task assignment-steps) is a
   **one-time snapshot** of active members; late joiners aren't auto-added

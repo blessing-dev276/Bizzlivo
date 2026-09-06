@@ -1,9 +1,9 @@
-# HQ360 — Phase 1
+# Bizzlivo — Phase 1
 
 Multi-tenant CBT/exam platform. Office admins upload a skill/service PDF, AI
 generates an MCQ/True-False exam, admin reviews and approves it, configures
 settings, assigns it to members, and members take the exam online with
-instant auto-grading. See `HQ360_Phase1_Spec.md` for the full scope.
+instant auto-grading. See `Bizzlivo_Phase1_Spec.md` for the full scope.
 
 Stack: React (Vite) + TypeScript, React Router, Supabase (Postgres, Auth,
 Storage, Edge Functions), Claude API for question generation.

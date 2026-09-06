@@ -96,7 +96,7 @@ export default function OfficeInsights({ data, role }: { data: OfficeSnapshot | 
   return (
     <section className="dash-card col-5">
       <div className="dash-card-head">
-        <h2><IcSpark className="dash-h-ico" /> HQ360 Intelligence</h2>
+        <h2><IcSpark className="dash-h-ico" /> Bizzlivo Intelligence</h2>
       </div>
       <div className="intel-list">
         {signals.map((s) => (

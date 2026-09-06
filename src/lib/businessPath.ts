@@ -1,4 +1,4 @@
-// Business Path — the progression layer that orchestrates existing HQ360
+// Business Path — the progression layer that orchestrates existing Bizzlivo
 // systems. It never stores "completed = true" for anything another system
 // already tracks: content completion reuses src/lib/taskProgress.ts,
 // activity/learning completion is counted live from the owning tables,

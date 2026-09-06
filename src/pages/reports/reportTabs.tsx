@@ -3,6 +3,7 @@ import type { ResolvedRange } from '../../lib/reports/range'
 import { reportsApi } from '../../lib/reports/api'
 import type {
   BusinessPathReport,
+  GoalsReport,
   IncomeReport,
   LearningReport,
   MemberReport,
@@ -541,6 +542,87 @@ function MemberDrawer({ orgId, userId, onClose }: { orgId: string; userId: strin
           </>
         )}
       </div>
+    </>
+  )
+}
+
+const GOAL_STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft', active: 'In Progress', submitted: 'Awaiting Review',
+  changes_requested: 'Changes Requested', approved: 'Approved', rejected: 'Rejected',
+  month_closed_incomplete: 'Closed — Incomplete', cancelled: 'Cancelled', legacy_completed: 'Completed',
+}
+const GOAL_CAT_LABEL: Record<string, string> = {
+  learning: 'Learning', network: 'Network', income: 'Income',
+  personal_development: 'Personal Development', business_path: 'Business Path', team: 'Team', other: 'Other',
+}
+
+export function GoalsTab({ orgId, filters }: { orgId: string; filters: ReportFilters }) {
+  const { data, state, retry, loading, errMsg } = useReport<GoalsReport>(
+    () => reportsApi.goals(orgId, filters.range),
+    [orgId, filters.range],
+  )
+  if (state === 'error') return <SectionError onRetry={retry} message={errMsg} />
+  const d = data
+  const setupRate = d && d.members > 0 ? Math.round((d.members_with_goals / d.members) * 100) : null
+
+  return (
+    <>
+      <ReportSection title="Goals — This Month">
+        <div className="rp-metrics">
+          <MetricCard label="Goal Setup Rate" loading={loading} value={setupRate == null ? '—' : `${setupRate}%`}
+            sub={d ? `${d.members_with_goals}/${d.members} members` : undefined} />
+          <MetricCard label="Missing Goals" loading={loading} value={d?.members_missing ?? '—'} higherIsBetter={false} />
+          <MetricCard label="Avg Completion" loading={loading} value={d ? `${d.this_month_avg_percent}%` : '—'} />
+          <MetricCard label="Awaiting Review" loading={loading} value={d?.awaiting_review ?? '—'} higherIsBetter={false} />
+          <MetricCard label="90-Day Plans" loading={loading} value={d?.quarter_plans ?? '—'} />
+          <MetricCard label="Approved (period)" loading={loading} value={d?.approved_in_window ?? '—'} />
+          <MetricCard label="Submitted (period)" loading={loading} value={d?.submitted_in_window ?? '—'} />
+          <MetricCard label="Rejected (period)" loading={loading} value={d?.rejected_in_window ?? '—'} higherIsBetter={false} />
+        </div>
+      </ReportSection>
+
+      <ReportSection title="This Month by Status">
+        {loading ? <div className="rp-sk rp-sk-block" /> : Object.keys(d?.this_month_status ?? {}).length === 0 ? (
+          <EmptyState text="No goals set for the current month yet." />
+        ) : (
+          <BarList rows={Object.entries(d!.this_month_status).map(([k, v]) => ({ label: GOAL_STATUS_LABEL[k] ?? k, value: v }))} />
+        )}
+      </ReportSection>
+
+      <ReportSection title="Completion by Category">
+        {loading ? <div className="rp-sk rp-sk-block" /> : (d?.by_category.length ?? 0) === 0 ? (
+          <EmptyState text="No categorised goals this month." />
+        ) : (
+          <BarList
+            rows={(d?.by_category ?? []).map((c) => ({ label: `${GOAL_CAT_LABEL[c.category] ?? c.category} (${c.goals})`, value: c.avg_percent }))}
+            max={100}
+            fmt={(v) => `${v}%`}
+          />
+        )}
+      </ReportSection>
+
+      <ReportSection title="By Team">
+        {loading ? <div className="rp-sk rp-sk-block" /> : (d?.by_team.length ?? 0) === 0 ? (
+          <EmptyState text="No teams created yet." />
+        ) : (
+          <div className="rp-table-wrap">
+            <table className="rp-table">
+              <thead><tr><th>Team</th><th>Members</th><th>Set goals</th><th>Approved</th></tr></thead>
+              <tbody>
+                {d?.by_team.map((t) => (
+                  <tr key={t.team}>
+                    <td>{t.team}</td>
+                    <td className="rp-dim">{t.members}</td>
+                    <td className="rp-dim">{t.with_goals}</td>
+                    <td className="rp-dim">{t.approved}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="rp-note">"This month" figures reflect the current calendar month, not the selected date range; period figures (created / submitted / approved / rejected) respect the range.</p>
+      </ReportSection>
     </>
   )
 }

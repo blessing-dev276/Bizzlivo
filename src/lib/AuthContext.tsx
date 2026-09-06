@@ -21,7 +21,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-const CURRENT_ORG_KEY = 'hq360.currentOrgId'
+const CURRENT_ORG_KEY = 'bizzlivo.currentOrgId'
+// One-time carry-over from the pre-rename key so the picked office persists.
+try {
+  const legacy = localStorage.getItem('hq360.currentOrgId')
+  if (legacy && !localStorage.getItem(CURRENT_ORG_KEY)) localStorage.setItem(CURRENT_ORG_KEY, legacy)
+} catch { /* ignore */ }
 
 // Module-level (not component-level) on purpose: React StrictMode's dev-mode
 // mount→unmount→remount cycle creates a *second* AuthProvider instance within

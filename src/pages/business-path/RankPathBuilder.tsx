@@ -14,7 +14,7 @@ type Opt = { id: string; title: string }
 
 const KIND_GROUPS: { group: string; kinds: BusinessPathItemKind[] }[] = [
   { group: 'Rank requirements (auto-validated)', kinds: ['profile_completion', 'onboarding_completion', 'learning_count', 'goal_created', 'three_month_goals', 'direct_member_count'] },
-  { group: 'Content (auto-completes from HQ360)', kinds: ['class', 'exam', 'assignment', 'resource', 'link'] },
+  { group: 'Content (auto-completes from Bizzlivo)', kinds: ['class', 'exam', 'assignment', 'resource', 'link'] },
   { group: 'Activity (counted from member data)', kinds: ['daily_reports', 'prospects_added', 'followups_logged', 'event_attendance', 'income_logged', 'monthly_goal'] },
   { group: 'Manual', kinds: ['manual_admin', 'manual_self'] },
 ]
@@ -482,7 +482,7 @@ export default function RankPathBuilder() {
                 <label>
                   Validation
                   <select value={form.validationMode} onChange={(e) => setForm((f) => ({ ...f, validationMode: e.target.value as 'automatic' | 'manual' }))}>
-                    <option value="automatic">Automatic — HQ360 checks the data</option>
+                    <option value="automatic">Automatic — Bizzlivo checks the data</option>
                     <option value="manual">Manual approval — a staff member confirms</option>
                   </select>
                 </label>

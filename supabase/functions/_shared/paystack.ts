@@ -67,6 +67,20 @@ export async function activatePaidPlan(
     .maybeSingle()
   if (existingEvent) return { alreadyProcessed: true }
 
+  // The charge amount is set client-side from plan_limits — re-check it
+  // against the DB here so a tampered checkout can't buy a higher plan
+  // for less. plan_limits is the single source of truth for price.
+  const { data: pl, error: plError } = await db
+    .from('plan_limits')
+    .select('price_monthly_kobo, price_yearly_kobo')
+    .eq('plan', params.plan)
+    .maybeSingle()
+  if (plError || !pl) throw new Error('Could not verify plan pricing.')
+  const expected = params.billingCycle === 'yearly' ? pl.price_yearly_kobo : pl.price_monthly_kobo
+  if (params.amountKobo !== expected) {
+    throw new Error(`Paid amount (${params.amountKobo}) does not match the ${params.plan}/${params.billingCycle} price (${expected}).`)
+  }
+
   const now = new Date()
   const periodEnd = periodEndFor(params.billingCycle, now)
 

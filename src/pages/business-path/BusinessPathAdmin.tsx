@@ -161,7 +161,7 @@ export default function BusinessPathAdmin({ readOnly = false }: { readOnly?: boo
           <h1>Business Path</h1>
           <p>
             The rank journey every member walks through. Each rank has a Learning Path and Business Tasks that
-            point at content and activity you already run in HQ360.
+            point at content and activity you already run in Bizzlivo.
           </p>
         </div>
         {!readOnly && <button type="button" onClick={openAdd}>+ Add Rank</button>}

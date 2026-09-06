@@ -144,3 +144,19 @@ export const AREA_LABELS: Record<string, string> = {
   personal_development: 'Personal Development',
   income_development: 'Income Development',
 }
+
+export interface GoalsReport {
+  members: number
+  members_with_goals: number
+  members_missing: number
+  quarter_plans: number
+  created_in_window: number
+  submitted_in_window: number
+  approved_in_window: number
+  rejected_in_window: number
+  awaiting_review: number
+  this_month_status: Record<string, number>
+  this_month_avg_percent: number
+  by_category: { category: string; goals: number; avg_percent: number }[]
+  by_team: { team: string; members: number; with_goals: number; approved: number }[]
+}

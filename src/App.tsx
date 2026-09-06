@@ -83,7 +83,7 @@ function LegacyRedirect({ from, to }: { from: string; to: string }) {
   return <Navigate to={`${to}${rest}${loc.search}`} replace />
 }
 
-// Reached at the root of an office's own subdomain (blaze-office.hq360.space),
+// Reached at the root of an office's own subdomain (blaze-office.bizzlivo.com),
 // resolved via a wildcard DNS record + Cloudflare Worker in front of Firebase
 // Hosting — the app itself just reads the hostname it landed on. Mirrors
 // ProtectedRoute's loading/no-session branches, but a logged-out visitor

@@ -281,15 +281,19 @@ export interface Notification {
   created_at: string
 }
 
+export type ReportsLevel = 'basic' | 'full' | 'advanced'
+
 export interface PlanLimits {
   plan: PlanTier
   price_monthly_kobo: number
   price_yearly_kobo: number
   max_members: number | null
+  max_admins: number | null
   max_resources: number | null
   max_published_exams: number | null
   ai_exam_generations_per_month: number
   ai_questions_per_month: number
+  reports_level: ReportsLevel
   removes_badge: boolean
   custom_branding: boolean
 }
@@ -331,8 +335,11 @@ export interface OrgUsage {
   trial_ends_at: string | null
   current_period_end: string | null
   cancel_at_period_end: boolean
+  amount_kobo: number | null
   max_members: number | null
   member_count: number
+  max_admins: number | null
+  admin_count: number
   max_resources: number | null
   resource_count: number
   max_published_exams: number | null
@@ -341,6 +348,7 @@ export interface OrgUsage {
   ai_exam_generations_used: number
   ai_questions_per_month: number
   ai_questions_used: number
+  reports_level: ReportsLevel
   removes_badge: boolean
   custom_branding: boolean
 }
@@ -557,7 +565,7 @@ export interface IncomeDevelopmentIncomeEntry {
 // Network Marketing (Training pillar, v1): each member works their own
 // contact pipeline from prospect through won customer/distributor — see
 // 0028_network_marketing.sql for why a "distributor" is a CRM record here,
-// not an actual HQ360 membership.
+// not an actual Bizzlivo membership.
 export type NetworkMarketingContactStage =
   | 'prospect' | 'invited' | 'presented' | 'followed_up' | 'won_customer' | 'won_distributor' | 'lost'
 
@@ -650,6 +658,9 @@ export type GoalCategory =
   | 'learning' | 'network' | 'income' | 'personal_development' | 'business_path' | 'team' | 'other'
 export type GoalPeriodType = 'monthly' | 'quarter'
 export type GoalPriority = 'low' | 'normal' | 'high'
+export type GoalAutoSource =
+  | 'prospects_added' | 'followups_logged' | 'income_amount' | 'income_entries'
+  | 'direct_members' | 'daily_reports' | 'exams_passed' | 'events_attended' | 'learning_modules'
 
 export interface MemberMonthlyGoal {
   id: string
@@ -671,6 +682,8 @@ export interface MemberMonthlyGoal {
   period_end: string | null
   parent_goal_id: string | null
   progress_mode: 'manual' | 'auto'
+  auto_source: GoalAutoSource | null
+  auto_area: string | null
   submitted_at: string | null
   submission_note: string | null
   evidence_url: string | null

@@ -8,6 +8,8 @@ import ThemeToggle from '../../components/ThemeToggle'
 interface OrgBranding {
   id: string
   name: string
+  plan_tier: string
+  logo_url: string | null
 }
 
 type Mode = 'login' | 'join'
@@ -42,16 +44,25 @@ export default function OfficeLogin({ slugOverride }: { slugOverride?: string } 
   const [joinSubmitting, setJoinSubmitting] = useState(false)
   const [joinSent, setJoinSent] = useState(false)
 
+  const [hideBadge, setHideBadge] = useState(false)
+
   useEffect(() => {
     if (!slug) return
     supabase
       .from('organizations')
-      .select('id, name')
+      .select('id, name, plan_tier, logo_url')
       .eq('slug', slug)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!data) setNotFound(true)
-        else setOrg(data as OrgBranding)
+      .then(async ({ data }) => {
+        if (!data) {
+          setNotFound(true)
+        } else {
+          const o = data as OrgBranding
+          setOrg(o)
+          // "Remove Bizzlivo badge" entitlement — plan_limits is public-readable.
+          const { data: pl } = await supabase.from('plan_limits').select('removes_badge').eq('plan', o.plan_tier).maybeSingle()
+          setHideBadge(!!(pl as { removes_badge: boolean } | null)?.removes_badge)
+        }
         setLoadingOrg(false)
       })
   }, [slug])
@@ -156,10 +167,15 @@ export default function OfficeLogin({ slugOverride }: { slugOverride?: string } 
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}>
         <div className="auth-logo" style={{ flexDirection: 'column', gap: 4 }}>
+          {org.logo_url && (
+            <img src={org.logo_url} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', marginBottom: 4 }} />
+          )}
           <span style={{ fontSize: 22 }}>{org.name}</span>
-          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
-            powered by HQ360
-          </span>
+          {!hideBadge && (
+            <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+              powered by Bizzlivo
+            </span>
+          )}
         </div>
 
         {mode === 'login' ? (
