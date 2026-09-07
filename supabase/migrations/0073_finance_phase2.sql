@@ -129,13 +129,13 @@ alter table provider_webhook_events enable row level security;
 create or replace function finance_record_webhook_event(
   p_provider text, p_event_type text, p_event_id text, p_sig_hash text
 ) returns boolean language plpgsql security definer set search_path = public as $$
-declare v_new boolean;
+declare v_rows int;
 begin
   insert into provider_webhook_events (provider, event_type, provider_event_id, signature_hash)
   values (p_provider, p_event_type, nullif(p_event_id,''), p_sig_hash)
   on conflict (provider, signature_hash) do nothing;
-  get diagnostics v_new = row_count;
-  return v_new > 0;
+  get diagnostics v_rows = row_count;
+  return v_rows > 0;
 end;
 $$;
 
@@ -434,3 +434,18 @@ grant execute on function finance_config_view(uuid) to authenticated;
 -- ------------------------------------------------------------
 grant execute on function finance_reconcile_scan(uuid) to authenticated;
 grant execute on function finance_resolve_flag(uuid, uuid) to authenticated;
+
+-- Edge-function-only surface: callable with the service role, never the
+-- browser. (Explicit so a default PUBLIC execute grant can't widen these.)
+revoke execute on function finance_transfer_begin(uuid, uuid) from public;
+revoke execute on function finance_transfer_ack(uuid, text, text) from public;
+revoke execute on function finance_transfer_settle(uuid, text, text, text, text) from public;
+revoke execute on function finance_set_recipient(uuid, text) from public;
+revoke execute on function finance_record_webhook_event(text, text, text, text) from public;
+revoke execute on function finance_mark_webhook_event(text, text, text) from public;
+grant execute on function finance_transfer_begin(uuid, uuid) to service_role;
+grant execute on function finance_transfer_ack(uuid, text, text) to service_role;
+grant execute on function finance_transfer_settle(uuid, text, text, text, text) to service_role;
+grant execute on function finance_set_recipient(uuid, text) to service_role;
+grant execute on function finance_record_webhook_event(text, text, text, text) to service_role;
+grant execute on function finance_mark_webhook_event(text, text, text) to service_role;
