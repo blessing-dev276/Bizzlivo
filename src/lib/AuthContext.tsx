@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { completeOfficeSignup } from './completeSignup'
+import { getOfficeSlugFromHost } from './tenant'
 import type { Membership, Organization, Profile } from '../types/database'
 
 export interface MembershipWithOrg extends Membership {
@@ -142,6 +143,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CURRENT_ORG_KEY, orgId)
     setCurrentOrgIdState(orgId)
   }
+
+  // On an office subdomain (<slug>.bizzlivo.com) the office is decided by
+  // the hostname, not by whatever org was last used — pin it for every
+  // route, so deep links like <slug>.bizzlivo.com/settings resolve to the
+  // right office.
+  useEffect(() => {
+    const hostSlug = getOfficeSlugFromHost(window.location.hostname)
+    if (!hostSlug) return
+    const match = memberships.find((m) => m.organization.slug === hostSlug)
+    if (match && match.org_id !== currentOrgId) setCurrentOrgId(match.org_id)
+  }, [memberships, currentOrgId])
 
   const currentMembership =
     memberships.find((m) => m.org_id === currentOrgId) ?? memberships[0] ?? null

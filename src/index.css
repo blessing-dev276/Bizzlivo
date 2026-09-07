@@ -3133,7 +3133,19 @@ td {
 /* ============================================================
    Member Dashboard v3 — rank-aware progress command center (.mrk)
    ============================================================ */
-.mrk .dash-grid { margin-top: 16px; }
+/* The member dashboard's top-level blocks (hero, rank ladder, banner,
+   Today's focus card, the card grid) are direct children of the page root
+   with no wrapper — unlike the admin dashboard's `.dash` flex column. Give
+   the root the same vertical rhythm so the cards don't butt against each
+   other. */
+.mdash.mrk { display: flex; flex-direction: column; gap: 18px; }
+/* the flex gap now owns the spacing between these blocks — drop their own
+   top margins so it stays even */
+.mrk .dash-grid,
+.mdash.mrk > .mrk-ladder { margin-top: 0; }
+@media (max-width: 680px) {
+  .mdash.mrk { gap: 14px; }
+}
 
 .mrk-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .mrk-hero-main h1 { margin: 0; }
