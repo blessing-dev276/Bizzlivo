@@ -25,7 +25,7 @@ export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: st
         <div className="wf-card">
           <h3>Your plan</h3>
           <p>{planLabel}. {isTopTier ? "You're on the top tier." : 'Unlock more members, quizzes and AI.'}</p>
-          {!isTopTier && <Link to="/settings?tab=billing" className="btn-primary-link">Upgrade plan</Link>}
+          {!isTopTier && <Link to="/settings/billing" className="btn-primary-link">Upgrade plan</Link>}
         </div>
       )}
 

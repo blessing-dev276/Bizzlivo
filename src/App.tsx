@@ -207,9 +207,14 @@ export default function App() {
           <Route path="/quizzes/:examId/analytics/:attemptId" element={<Protected><AttemptDetail /></Protected>} />
           <Route path="/quizzes/:examId/roster" element={<Protected><ExamRoster /></Protected>} />
 
-          {/* Billing now lives inside Settings — keep the old path working. */}
-          <Route path="/billing" element={<Navigate to="/settings?tab=billing" replace />} />
-          <Route path="/settings" element={<Protected><Settings /></Protected>} />
+          {/* Billing lives under Settings — keep old paths working. */}
+          <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
+          <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
+          <Route path="/settings/profile" element={<Protected><Settings section="profile" /></Protected>} />
+          <Route path="/settings/notifications" element={<Protected><Settings section="notifications" /></Protected>} />
+          <Route path="/settings/security" element={<Protected><Settings section="security" /></Protected>} />
+          <Route path="/settings/office" element={<Protected><Settings section="office" /></Protected>} />
+          <Route path="/settings/billing" element={<Protected><Settings section="billing" /></Protected>} />
           <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 
           <Route path="/reports" element={<Protected><ReportsInsights /></Protected>} />

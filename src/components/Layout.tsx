@@ -44,31 +44,32 @@ function NavItem({
 }
 
 // A collapsible sidebar section that nests NavItems under one labelled row.
-// Auto-opens (and stays lit) when the current route is one of `paths`.
+// Open/closed is controlled by the parent so only one group is open at a
+// time (accordion); it still lights up when the current route is inside.
 function NavGroup({
   icon,
   label,
   paths,
+  open,
+  onToggle,
   children,
 }: {
   icon: ReactNode
   label: string
   paths: string[]
+  open: boolean
+  onToggle: () => void
   children: ReactNode
 }) {
   const { pathname } = useLocation()
   const isInside = paths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-  const [open, setOpen] = useState(isInside)
-  useEffect(() => {
-    if (isInside) setOpen(true)
-  }, [isInside])
 
   return (
     <div className="nav-group">
       <button
         type="button"
         className={`nav-group-toggle ${isInside ? 'active' : ''}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={onToggle}
         aria-expanded={open}
       >
         <span className="nav-group-lead">
@@ -233,11 +234,11 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Settings',
         paths: ['/settings'],
         children: [
-          { to: '/settings', icon: I.profile, label: 'Profile', end: true },
-          { to: '/settings?tab=notifications', icon: I.megaphone, label: 'Notifications' },
-          { to: '/settings?tab=security', icon: I.settings, label: 'Account & Security' },
-          { to: '/settings?tab=office', icon: I.myTeam, label: 'Office', show: (c) => c.isAdmin },
-          { to: '/settings?tab=billing', icon: I.wallet, label: 'Billing & Plan', show: (c) => c.isAdmin },
+          { to: '/settings/profile', icon: I.profile, label: 'Profile' },
+          { to: '/settings/notifications', icon: I.megaphone, label: 'Notifications' },
+          { to: '/settings/security', icon: I.settings, label: 'Account & Security' },
+          { to: '/settings/office', icon: I.myTeam, label: 'Office', show: (c) => c.isAdmin },
+          { to: '/settings/billing', icon: I.wallet, label: 'Billing & Plan', show: (c) => c.isAdmin },
         ],
       },
       { to: '/help', icon: I.help, label: 'Help & Support' },
@@ -459,12 +460,37 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
   const navSections = resolveNav(navCtx)
 
+  // Accordion: only one nav group open at a time. Opening one closes the
+  // rest; navigating into a group's route opens it and closes the others.
+  const { pathname: navPathname } = useLocation()
+  const activeGroupLabel = (() => {
+    for (const section of navSections) {
+      for (const entry of section.items) {
+        if (isGroup(entry) && entry.paths.some((p) => navPathname === p || navPathname.startsWith(`${p}/`))) {
+          return entry.label
+        }
+      }
+    }
+    return null
+  })()
+  const [openGroup, setOpenGroup] = useState<string | null>(activeGroupLabel)
+  useEffect(() => {
+    if (activeGroupLabel) setOpenGroup(activeGroupLabel)
+  }, [activeGroupLabel])
+
   const sidebarNav = navSections.map((section) => (
     <div className="sidebar-sec" key={section.label}>
       <span className="sidebar-sec-label">{section.label}</span>
       {section.items.map((entry) =>
         isGroup(entry) ? (
-          <NavGroup key={entry.label} icon={entry.icon} label={entry.label} paths={entry.paths}>
+          <NavGroup
+            key={entry.label}
+            icon={entry.icon}
+            label={entry.label}
+            paths={entry.paths}
+            open={openGroup === entry.label}
+            onToggle={() => setOpenGroup((cur) => (cur === entry.label ? null : entry.label))}
+          >
             {entry.children.map((child) => (
               <NavItem
                 key={child.to}
@@ -533,7 +559,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {canManageBilling && planLabel && (
             <div className="plan-row">
               <span className={`badge ${planBadgeClass}`}>{planLabel}</span>
-              {!isTopTier && <Link to="/settings?tab=billing" className="plan-upgrade-btn">Upgrade</Link>}
+              {!isTopTier && <Link to="/settings/billing" className="plan-upgrade-btn">Upgrade</Link>}
             </div>
           )}
 

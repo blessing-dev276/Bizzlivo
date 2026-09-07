@@ -387,7 +387,7 @@ export default function Invites() {
               <>You're using <strong>{seats.used} of {seats.max}</strong> member seats.</>
             )}
           </p>
-          <Link to="/settings?tab=billing" className="btn-primary-link">Upgrade</Link>
+          <Link to="/settings/billing" className="btn-primary-link">Upgrade</Link>
         </div>
       )}
 

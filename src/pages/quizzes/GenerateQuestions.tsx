@@ -123,7 +123,7 @@ export default function GenerateQuestions() {
         return (
           <p className={`limit-note ${overBudget ? 'attn' : ''}`} style={{ marginBottom: 16 }}>
             {generationsLeft} of {usage.ai_exam_generations_per_month} monthly AI generations left · {questionsLeft} of {usage.ai_questions_per_month} monthly AI questions left
-            {overBudget && <> · <Link to="/settings?tab=billing">Upgrade for more →</Link></>}
+            {overBudget && <> · <Link to="/settings/billing">Upgrade for more →</Link></>}
           </p>
         )
       })()}
