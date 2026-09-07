@@ -8,7 +8,7 @@
 --
 --   Starter   ₦7,000/mo    ₦70,000/yr    up to 10 members,  2 admin seats
 --   Growth    ₦15,000/mo   ₦150,000/yr   up to 50 members,  6 admin seats   (recommended)
---   Business  ₦35,000/mo   ₦350,000/yr   50+ members (unlimited), unlimited admins
+--   Business  ₦25,000/mo   ₦250,000/yr   50+ members (unlimited), unlimited admins
 --   (yearly = 10× monthly ≈ 2 months free)
 --
 -- When a trial or a paid period lapses, the org is parked in a
@@ -89,8 +89,8 @@ update plan_limits set
 where plan = 'growth';
 
 update plan_limits set
-  price_monthly_kobo = 3500000,     -- ₦35,000
-  price_yearly_kobo   = 35000000,   -- ₦350,000
+  price_monthly_kobo = 2500000,     -- ₦25,000
+  price_yearly_kobo   = 25000000,   -- ₦250,000
   max_members         = null,       -- 50+ / unlimited
   max_admins          = null,       -- unlimited
   max_resources       = null,

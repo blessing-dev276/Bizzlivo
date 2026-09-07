@@ -7,8 +7,8 @@ import { supabase } from '../supabase'
 
 export type FreelanceProspectStatus =
   | 'lead' | 'contacted' | 'replied' | 'negotiating' | 'proposal_sent' | 'won' | 'lost'
-export type FreelanceProjectStatus =
-  | 'new' | 'in_progress' | 'delivered' | 'revision' | 'completed' | 'cancelled'
+// The freelance workspace tracks work through four plain states.
+export type FreelanceProjectStatus = 'pending' | 'active' | 'completed' | 'cancelled'
 
 export const PROSPECT_STATUS: { id: FreelanceProspectStatus; label: string; tone: string }[] = [
   { id: 'lead', label: 'Lead', tone: 'neutral' },
@@ -20,16 +20,14 @@ export const PROSPECT_STATUS: { id: FreelanceProspectStatus; label: string; tone
   { id: 'lost', label: 'Lost', tone: 'muted' },
 ]
 export const PROJECT_STATUS: { id: FreelanceProjectStatus; label: string; tone: string }[] = [
-  { id: 'new', label: 'New', tone: 'neutral' },
-  { id: 'in_progress', label: 'In Progress', tone: 'blue' },
-  { id: 'delivered', label: 'Delivered', tone: 'amber' },
-  { id: 'revision', label: 'Revision', tone: 'amber' },
+  { id: 'active', label: 'Active', tone: 'blue' },
+  { id: 'pending', label: 'Pending', tone: 'amber' },
   { id: 'completed', label: 'Completed', tone: 'green' },
   { id: 'cancelled', label: 'Cancelled', tone: 'muted' },
 ]
 export const PLATFORMS = ['Fiverr', 'Upwork', 'Contra', 'LinkedIn', 'Instagram', 'Direct', 'Referral', 'Other']
 export const PROSPECT_OPEN: FreelanceProspectStatus[] = ['lead', 'contacted', 'replied', 'negotiating', 'proposal_sent']
-export const PROJECT_OPEN: FreelanceProjectStatus[] = ['new', 'in_progress', 'delivered', 'revision']
+export const PROJECT_OPEN: FreelanceProjectStatus[] = ['pending', 'active']
 
 export interface FreelanceClient {
   id: string

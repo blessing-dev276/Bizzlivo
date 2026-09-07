@@ -54,54 +54,43 @@ const STEPS = [
   { n: '03', title: 'Run the whole operation', body: 'Publish learning, define your rank path, assign assessments, track income and read the numbers.' },
 ]
 
+// Every package includes every feature — the only differences are member
+// seats, admin seats and monthly AI quota. Keep in sync with plan_limits
+// (migration 0061) and lib/entitlements PLAN_META.
+const PLAN_FEATURES = [
+  'Every feature: Dashboard, Learning Center, Business Path',
+  'Goals, My Network, Finance, Wallet & payouts',
+  'Events & assessments',
+  'Advanced reports — custom ranges + CSV export',
+  'Custom logo & brand colour, no Bizzlivo badge',
+  'Priority support',
+]
+
 const PLANS = [
   {
-    name: 'Free',
-    price: '₦0',
-    per: '',
-    note: 'For small offices getting started.',
-    features: [
-      'Up to 5 members',
-      '1 admin seat',
-      'Dashboard, Learning Center & Business Path',
-      'Goals, My Network, Finance & Wallet',
-      'Events & assessments',
-      'Basic reports & insights',
-    ],
-    cta: 'Start free',
+    name: 'Starter',
+    price: '₦7,000',
+    per: '/mo',
+    note: 'For a small office finding its feet.',
+    features: ['Up to 10 members', '2 admin seats', 'AI: 15 generations · 400 questions / month', ...PLAN_FEATURES],
+    cta: 'Start 30-day trial',
   },
   {
     name: 'Growth',
     price: '₦15,000',
     per: '/mo',
-    note: 'For growing offices building consistent teams.',
-    features: [
-      'Up to 25 members',
-      '2 admin seats',
-      'Everything in Free',
-      'Full reports & insights',
-      'AI question generation',
-      'No “Powered by Bizzlivo” badge',
-      'Priority support',
-    ],
-    cta: 'Start Growth',
+    note: 'For a growing office building a consistent team.',
+    features: ['Up to 50 members', '6 admin seats', 'AI: 40 generations · 1,200 questions / month', ...PLAN_FEATURES],
+    cta: 'Start 30-day trial',
     popular: true,
   },
   {
     name: 'Business',
-    price: '₦35,000',
+    price: '₦25,000',
     per: '/mo',
-    note: 'For established offices managing larger teams.',
-    features: [
-      'Up to 100 members',
-      '5 admin seats',
-      'Everything in Growth',
-      'Advanced reports — custom ranges + CSV export',
-      'Wallet & payouts',
-      'Custom logo & brand colour',
-      'Priority support',
-    ],
-    cta: 'Choose Business',
+    note: 'For an established office at scale.',
+    features: ['50+ members (unlimited)', 'Unlimited admin seats', 'Unlimited AI generations & questions', ...PLAN_FEATURES],
+    cta: 'Start 30-day trial',
   },
 ]
 
@@ -249,8 +238,8 @@ export default function Landing() {
         <section className="lp-section lp-shell" id="pricing">
           <div className="lp-section-head" data-reveal>
             <span className="lp-kicker">Pricing</span>
-            <h2>Start free. Upgrade when you grow.</h2>
-            <p>Every plan includes branded offices, secure isolation and unlimited learning content. Paid plans are billed monthly — pay yearly and get about two months free.</p>
+            <h2>Every feature, every package. 30 days free.</h2>
+            <p>Start with a 30-day free trial, then pick a package. Every package includes every feature — the only differences are member seats, admin seats and monthly AI quota. Pay yearly and get about two months free.</p>
           </div>
           <div className="lp-plans">
             {PLANS.map((p) => (
