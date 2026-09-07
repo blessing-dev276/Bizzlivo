@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "pdfjs-dist": "^4.7.76",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
