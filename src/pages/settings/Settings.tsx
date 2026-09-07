@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/AuthContext'
 import Billing from '../billing/Billing'
@@ -7,35 +8,20 @@ import NotificationSettings from './NotificationSettings'
 import SecuritySettings from './SecuritySettings'
 import MembershipDanger from './MembershipDanger'
 
-// Profile + Notifications are for everyone; Office and Billing are admin-only.
-type Section = 'profile' | 'notifications' | 'security' | 'office' | 'billing'
-const SECTIONS: Section[] = ['profile', 'notifications', 'security', 'office', 'billing']
-
 const ADMIN_ROLES = new Set(['admin'])
 
 export default function Settings() {
   const { currentMembership } = useAuth()
   const isAdmin = currentMembership ? ADMIN_ROLES.has(currentMembership.role) : false
 
-  // The active tab lives in the URL (?tab=billing) so links elsewhere in
-  // the app — "Upgrade" buttons especially — can deep-link straight to a
-  // section instead of a standalone page.
-  const [params, setParams] = useSearchParams()
-  const requested = params.get('tab') as Section | null
-  const isAllowed = requested != null && SECTIONS.includes(requested) && (!['office', 'billing'].includes(requested) || isAdmin)
-  const section: Section = isAllowed ? (requested as Section) : 'profile'
-
-  const setSection = (next: Section) => {
-    setParams(
-      (prev) => {
-        const p = new URLSearchParams(prev)
-        if (next === 'profile') p.delete('tab')
-        else p.set('tab', next)
-        return p
-      },
-      { replace: true },
-    )
-  }
+  // Everything is on one page now. Links elsewhere (the "Upgrade" buttons
+  // especially) still pass ?tab=billing — jump to that section on load.
+  const [params] = useSearchParams()
+  const tab = params.get('tab')
+  useEffect(() => {
+    if (!tab) return
+    document.getElementById(`settings-${tab}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [tab])
 
   return (
     <div className="page">
@@ -43,35 +29,27 @@ export default function Settings() {
         <h1>Settings</h1>
       </div>
 
-      <div className="cycle-toggle" style={{ marginBottom: 24 }}>
-        <button type="button" className={section === 'profile' ? 'active' : ''} onClick={() => setSection('profile')}>
-          Profile
-        </button>
-        <button type="button" className={section === 'notifications' ? 'active' : ''} onClick={() => setSection('notifications')}>
-          Notifications
-        </button>
-        <button type="button" className={section === 'security' ? 'active' : ''} onClick={() => setSection('security')}>
-          Security
-        </button>
-        {isAdmin && (
-          <button type="button" className={section === 'office' ? 'active' : ''} onClick={() => setSection('office')}>
-            Office
-          </button>
-        )}
-        {isAdmin && (
-          <button type="button" className={section === 'billing' ? 'active' : ''} onClick={() => setSection('billing')}>
-            Billing
-          </button>
-        )}
-      </div>
+      <section id="settings-profile" style={{ scrollMarginTop: 20 }}>
+        <ProfileSettings />
+      </section>
+      <section id="settings-notifications" style={{ scrollMarginTop: 20 }}>
+        <NotificationSettings />
+      </section>
+      <section id="settings-security" style={{ scrollMarginTop: 20 }}>
+        <SecuritySettings />
+      </section>
+      {isAdmin && (
+        <section id="settings-office" style={{ scrollMarginTop: 20 }}>
+          <OfficeSettings />
+        </section>
+      )}
+      {isAdmin && (
+        <section id="settings-billing" style={{ scrollMarginTop: 20 }}>
+          <Billing />
+        </section>
+      )}
 
-      {section === 'profile' && <ProfileSettings />}
-      {section === 'notifications' && <NotificationSettings />}
-      {section === 'security' && <SecuritySettings />}
-      {section === 'office' && isAdmin && <OfficeSettings />}
-      {section === 'billing' && isAdmin && <Billing />}
-
-      {(section === 'profile' || section === 'office') && <MembershipDanger />}
+      <MembershipDanger />
     </div>
   )
 }
