@@ -1,6 +1,5 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { slugCandidates } from './slug'
 import { seedDefaultRanks } from './businessPath'
 
 const UNIQUE_VIOLATION = '23505'
@@ -44,32 +43,23 @@ export async function completeOfficeSignup(user: User): Promise<string | null> {
   })
   if (profileError && profileError.code !== UNIQUE_VIOLATION) throw profileError
 
-  // Org id is generated client-side (not read back via `.select()` after
-  // insert): the organizations SELECT policy requires org membership, which
-  // doesn't exist yet at the instant of insert. See slugCandidates() for why
-  // a pre-insert "does this slug exist" check can't substitute for this.
-  const orgId = crypto.randomUUID()
-  let created = false
-  let lastMessage = 'Could not find an available office slug.'
-
-  for (const slug of slugCandidates(officeName)) {
-    const { error: orgError } = await supabase.from('organizations').insert({ id: orgId, name: officeName, slug })
-    if (!orgError) {
-      created = true
-      break
-    }
-    if (orgError.code !== UNIQUE_VIOLATION) throw orgError
-    lastMessage = orgError.message
-  }
-  if (!created) throw new Error(lastMessage)
-
-  const { error: membershipError } = await supabase.from('memberships').insert({
-    org_id: orgId,
-    user_id: user.id,
-    role: 'admin',
-    status: 'active',
+  // Org + admin membership are created by a single SECURITY DEFINER RPC
+  // (0062) that holds a per-user advisory lock for the length of the
+  // transaction. Doing it client-side — loop slug candidates, INSERT each
+  // until one doesn't 23505 — let two concurrent runs for the same user
+  // (re-opened confirmation link, two tabs, StrictMode double-invoke,
+  // INITIAL_SESSION + SIGNED_IN back to back) each pass the "no membership
+  // yet" check and each create an office, one as `acme` and the other as
+  // `acme-2`. The RPC serializes them and returns the existing org id on
+  // the second call. It's idempotent, so retrying on a later login is safe.
+  const { data: orgId, error: orgError } = await supabase.rpc('create_office_for_signup', {
+    p_office_name: officeName,
+    p_full_name: fullName,
   })
-  if (membershipError) throw membershipError
+  if (orgError) throw orgError
+  if (!orgId || typeof orgId !== 'string') {
+    throw new Error('Could not create your office. Please try signing in again.')
+  }
 
   // Best-effort: attach this office's branded subdomain
   // (<slug>.bizzlivo.com) to the Vercel project so it gets its own cert
