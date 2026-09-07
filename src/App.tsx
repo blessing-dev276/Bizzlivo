@@ -68,6 +68,7 @@ const OfficeUpdates = lazy(() => import('./pages/announcements/OfficeUpdates'))
 const AnnouncementsAdmin = lazy(() => import('./pages/announcements/AnnouncementsAdmin'))
 const MemberProfile360 = lazy(() => import('./pages/members/MemberProfile360'))
 const Platform = lazy(() => import('./pages/platform/Platform'))
+const HelpCenter = lazy(() => import('./pages/help/HelpCenter'))
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 const FinanceWorkspace = lazy(() => import('./pages/finance/FinanceWorkspace'))
 
@@ -186,6 +187,7 @@ export default function App() {
 
           <Route path="/billing" element={<Protected><Billing /></Protected>} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
+          <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 
           <Route path="/reports" element={<Protected><ReportsInsights /></Protected>} />
           <Route path="/reports/training" element={<Navigate to="/reports?view=learning" replace />} />

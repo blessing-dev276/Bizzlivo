@@ -4,9 +4,10 @@ import Billing from '../billing/Billing'
 import ProfileSettings from './ProfileSettings'
 import OfficeSettings from './OfficeSettings'
 import NotificationSettings from './NotificationSettings'
+import SecuritySettings from './SecuritySettings'
 
 // Profile + Notifications are for everyone; Office and Billing are admin-only.
-type Section = 'profile' | 'notifications' | 'office' | 'billing'
+type Section = 'profile' | 'notifications' | 'security' | 'office' | 'billing'
 
 const ADMIN_ROLES = new Set(['admin'])
 
@@ -28,6 +29,9 @@ export default function Settings() {
         <button type="button" className={section === 'notifications' ? 'active' : ''} onClick={() => setSection('notifications')}>
           Notifications
         </button>
+        <button type="button" className={section === 'security' ? 'active' : ''} onClick={() => setSection('security')}>
+          Security
+        </button>
         {isAdmin && (
           <button type="button" className={section === 'office' ? 'active' : ''} onClick={() => setSection('office')}>
             Office
@@ -42,6 +46,7 @@ export default function Settings() {
 
       {section === 'profile' && <ProfileSettings />}
       {section === 'notifications' && <NotificationSettings />}
+      {section === 'security' && <SecuritySettings />}
       {section === 'office' && isAdmin && <OfficeSettings />}
       {section === 'billing' && isAdmin && <Billing />}
     </div>

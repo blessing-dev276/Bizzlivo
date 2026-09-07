@@ -494,6 +494,31 @@ The system has general leaderboard views based on attempts/performance. The newe
 
 Entirely separate from office roles. `platform_admins` + `is_platform_admin()` (0003) gate a standalone `/platform/*` shell (`src/pages/platform/Platform.tsx`) rendered **outside** `<Protected>` — it does its own auth/platform-admin check. Data: `platform_overview()` (0051 — org counts, users, active-7d from `activity_log`, MRR from `subscriptions × plan_limits`, monthly AI usage, newest orgs) plus the existing 0003 RPCs `admin_list_offices()` / `admin_get_office_detail(org)` / `admin_set_office_status(org, status)` / `admin_set_plan_tier(org, plan)` (all `is_platform_admin`-guarded, and status/plan changes write `audit_log`). Pages: Overview, Organizations list, Org detail (suspend / reactivate / plan override). Office admins can never reach these — the RPCs return empty / raise for non-platform-admins and the route redirects.
 
+### Help & Support (`/help`, `0052`)
+
+`support_tickets(org_id, created_by, category (bug|question|billing|feature_request|other), subject, description, priority, status (open|in_progress|resolved|closed), admin_note, handled_by, timestamps)`. RLS: the creator reads their own always and edits only while `open`; office admins read + work every ticket in their org; **platform admins read all**. `src/pages/help/HelpCenter.tsx` (`/help`, everyone) has tabs: **Help Center** (static explainer cards that link into the app, from `HELP_ARTICLES` in `src/lib/support.ts`), **Contact Support** (one form → a ticket), **My Requests** (the member's tickets + the office's `admin_note` reply), and **Office Tickets** (admin-only triage drawer: set status, write a note to the member). No message thread — deliberately not a helpdesk clone.
+
+### Account & Security (Settings → Security, Phase 11)
+
+`src/pages/settings/SecuritySettings.tsx` — a Security tab in Settings for every role. Exposes only what Supabase Auth actually supports: change email (`auth.updateUser({ email })`, dual-confirmation), change password (`auth.updateUser({ password })`), and **sign out of other devices** (`auth.signOut({ scope: 'others' })`). A session list / security-event log isn't available from the client and isn't faked. Finance remains the hardened area — every state transition already goes through a `security definer` `finance_*` RPC with `fin_assert_admin`, `member_payout_accounts` is owner-only, and `finance_events` is the finance audit log; 0052 changed none of it.
+
+### Role matrix (current)
+
+| Capability | Platform Admin | Office Admin | Trainer | Team Leader | Member |
+|---|---|---|---|---|---|
+| `/platform/*` (orgs, MRR, suspend, plan override) | ✅ | — | — | — | — |
+| Office settings / billing / invites / Business Path config | — | ✅ | — | — | — |
+| Learning Center + events + assessments authoring | — | ✅ | ✅ | — | — |
+| Reports & Insights | — | ✅ (all tabs) | Learning tab only | → `/team-performance` | — |
+| Goals Review | — | ✅ (org) | — | ✅ (own team) | — |
+| Member 360 (`/members/:id`) | — | ✅ (org) | — | ✅ (own team) | — |
+| Announcements authoring | — | ✅ | — | — | — |
+| Support ticket triage | read-all | ✅ (org) | — | — | own only |
+| Finance workspace / withdrawals review | — | ✅ | — | — | own wallet only |
+| Own workspace (dashboard, learning, goals, network, freelance, wallet, help, security) | — | ✅ | ✅ | ✅ | ✅ |
+
+RLS enforces every row of this; frontend role checks are convenience only.
+
 ## 16. Billing and plan enforcement
 
 `plan_limits` (one row per plan) is the **single source of truth** for prices *and* entitlements. It is read by the Billing page (`fetchPlanLimits`), the `get_org_usage()` RPC, every enforcement trigger, and `generate-questions`. A price or entitlement change is one migration — no Paystack-side edit, because checkout is a one-off inline charge whose amount is derived from these rows.
