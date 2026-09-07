@@ -82,14 +82,6 @@ export function useOfficeSnapshot(orgId: string | undefined) {
       d.setHours(0, 0, 0, 0)
       return d.toISOString()
     })()
-    const todayStart = (() => {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      return d.toISOString()
-    })()
-    const todayEnd = iso(new Date(todayStart).getTime() + 86400000)
-    const nowIso = iso(now)
-
     async function load(org: string) {
       const [
         totalMembersR,

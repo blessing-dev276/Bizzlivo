@@ -1,5 +1,5 @@
 -- ============================================================
--- 0065 — FINANCE PHASE 1  (Decisions A3 · B · C · D · E)
+-- 0072 — FINANCE PHASE 1  (Decisions A3 · B · C · D · E)
 --
 -- Bizzlivo stays the software CONTROL / ACCOUNTING / AUTHORIZATION
 -- layer. It never holds customer funds and never moves money in this
