@@ -290,6 +290,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { usage } = useOrgUsage(orgId)
   const badges = useStaffBadges(orgId, isAdmin)
   const [cmdkOpen, setCmdkOpen] = useState(false)
+  const [topMenuOpen, setTopMenuOpen] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdkOpen((v) => !v) }
@@ -543,19 +544,50 @@ export default function Layout({ children }: { children: ReactNode }) {
             <kbd>⌘K</kbd>
           </button>
 
-          <button
-            type="button"
-            className={`topbar-icon-btn ${refreshing ? 'is-spinning' : ''}`}
-            onClick={handleRefresh}
-            disabled={refreshing}
-            aria-label="Refresh"
-            title="Refresh"
-          >
-            <svg viewBox="0 0 24 24"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
-          </button>
-          <NotificationBell />
-          <ThemeToggle />
-          <ProfileMenu />
+          <div className="topbar-controls">
+            <button
+              type="button"
+              className={`topbar-icon-btn ${refreshing ? 'is-spinning' : ''}`}
+              onClick={handleRefresh}
+              disabled={refreshing}
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <svg viewBox="0 0 24 24"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+            </button>
+            <NotificationBell />
+            <ThemeToggle />
+            <ProfileMenu />
+            <button type="button" className="topbar-logout" onClick={handleSignOut} aria-label="Log out" title="Log out">
+              <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+              <span>Log out</span>
+            </button>
+          </div>
+
+          <div className="topbar-more">
+            <button
+              type="button"
+              className="topbar-icon-btn"
+              onClick={() => setTopMenuOpen((v) => !v)}
+              aria-label="More"
+              aria-expanded={topMenuOpen}
+            >
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
+            </button>
+            {topMenuOpen && (
+              <>
+                <div className="topbar-more-back" onClick={() => setTopMenuOpen(false)} />
+                <div className="topbar-more-menu">
+                  <button type="button" onClick={() => { setTopMenuOpen(false); setCmdkOpen(true) }}>Search</button>
+                  <button type="button" onClick={() => { setTopMenuOpen(false); navigate('/notifications') }}>Notifications</button>
+                  <button type="button" onClick={() => { setTopMenuOpen(false); handleRefresh() }} disabled={refreshing}>Refresh</button>
+                  <div className="topbar-more-theme"><span>Theme</span><ThemeToggle /></div>
+                  <button type="button" onClick={() => { setTopMenuOpen(false); navigate('/settings') }}>Profile &amp; settings</button>
+                  <button type="button" className="danger" onClick={handleSignOut}>Log out</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <Fragment key={routeKey}>{children}</Fragment>
       </main>
