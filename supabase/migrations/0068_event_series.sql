@@ -1,5 +1,5 @@
 -- ============================================================
--- 0066 — Events → recurring office meeting & training system (Phase A)
+-- 0068 — Events → recurring office meeting & training system (Phase A)
 -- ============================================================
 -- Evolves the existing `events` table into a SERIES definition and adds a
 -- lazily-materialized OCCURRENCE model, per-occurrence ATTENDANCE, and a

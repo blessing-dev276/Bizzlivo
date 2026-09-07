@@ -946,9 +946,18 @@ export type FinanceChargeType =
 export type FinanceLedgerEntryType =
   | 'order_recorded' | 'settlement' | 'conversion' | 'charge' | 'charge_reversal'
   | 'available_credit' | 'withdrawal_reserve' | 'withdrawal_release' | 'payout' | 'adjustment'
+  | 'payout_debit' | 'adjustment_credit' | 'adjustment_debit' | 'reversal'
 
+// Phase 1 withdrawal state machine (0065). APPROVAL and CONFIRMED PAYMENT
+// are deliberately separate steps.
 export type WithdrawalStatus =
-  | 'requested' | 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled'
+  | 'requested' | 'under_review' | 'approved' | 'authorized_for_payment'
+  | 'payment_recorded' | 'paid' | 'rejected' | 'cancelled' | 'failed' | 'reversed'
+
+// What a member sees — the internal states above collapse to three.
+export type WithdrawalMemberStatus = 'received' | 'processing' | 'paid' | 'not_approved' | 'returned'
+
+export type FinancePaymentChannel = 'office_bank_transfer' | 'provider_transfer' | 'other'
 
 export interface FinanceOrder {
   id: string
@@ -1027,16 +1036,59 @@ export interface WithdrawalRequest {
   currency: string
   method: string | null
   payout_account_id: string | null
-  payout_snapshot: { bank_name: string; account_name: string; account_number: string } | null
+  payout_snapshot: {
+    bank_name?: string; account_name?: string; account_number?: string
+    masked_account_number?: string; bank_code?: string
+  } | null
   member_note: string | null
   status: WithdrawalStatus
   available_before: number | null
+  approvals_required: number
+  approvals_count: number
+  first_approver_id: string | null
+  first_approved_at: string | null
+  second_approver_id: string | null
+  second_approved_at: string | null
+  authorized_by: string | null
+  authorized_at: string | null
+  payment_recorded_by: string | null
+  payment_recorded_at: string | null
+  confirmed_by: string | null
+  confirmed_at: string | null
+  paid_at: string | null
+  failure_reason: string | null
+  active_payment_id: string | null
   reviewed_by: string | null
   reviewed_at: string | null
   admin_note: string | null
   decided_reason: string | null
   created_at: string
   updated_at: string
+}
+
+export interface WithdrawalPayment {
+  id: string
+  org_id: string
+  withdrawal_id: string
+  attempt_number: number
+  execution_channel: FinancePaymentChannel
+  provider: string | null
+  amount: number
+  currency: string
+  payment_method: string | null
+  bank_or_provider: string | null
+  transaction_reference: string
+  payment_date: string
+  proof_url: string | null
+  internal_note: string | null
+  idempotency_key: string
+  status: 'recorded' | 'confirmed' | 'failed' | 'reversed'
+  recorded_by: string
+  confirmed_by: string | null
+  confirmed_at: string | null
+  failure_reason: string | null
+  provider_reference: string | null
+  created_at: string
 }
 
 export interface FinancePayout {
@@ -1076,6 +1128,12 @@ export interface MemberPayoutAccount {
   bank_name: string
   account_name: string
   account_number: string
+  provider: string
+  bank_code: string | null
+  masked_account_number: string | null
+  provider_recipient_code: string | null
+  status: 'unverified' | 'verified' | 'failed' | 'disabled'
+  verified_at: string | null
   is_default: boolean
   created_at: string
   updated_at: string
@@ -1086,7 +1144,80 @@ export interface MoneyByCurrency { currency: string; amount: number }
 export interface FinanceMemberBalances {
   available: MoneyByCurrency[]
   lifetime_gross: MoneyByCurrency[]
+  total_credited: MoneyByCurrency[]
   pending_platform: MoneyByCurrency[]
   pending_withdrawal: MoneyByCurrency[]
   total_paid_out: MoneyByCurrency[]
+}
+
+// ---- Finance Phase 1 config / permissions (0065) ----
+
+export type FinanceCapability =
+  | 'view' | 'verify_settlement' | 'review' | 'approve'
+  | 'authorize' | 'record_payment' | 'confirm_payment' | 'reconcile'
+
+export interface FinanceViewerCapabilities extends Record<FinanceCapability, boolean> {
+  is_admin: boolean
+}
+
+export interface OrgFinanceConnection {
+  id: string
+  org_id: string
+  provider: string
+  connection_type: 'external_manual' | 'connected_merchant' | 'provider_subaccount' | 'other'
+  settlement_account_name: string | null
+  settlement_bank_name: string | null
+  settlement_masked_number: string | null
+  currency: string
+  status: 'not_connected' | 'pending_verification' | 'active' | 'restricted' | 'suspended'
+  capabilities: Record<string, boolean>
+  verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OrgFinanceConfig {
+  org_id: string
+  finance_enabled: boolean
+  finance_status: 'active' | 'restricted' | 'suspended'
+  finance_status_reason: string | null
+  base_currency: string
+  manual_payout_enabled: boolean
+  automated_payout_enabled: boolean
+  withdrawals_paused: boolean
+  minimum_withdrawal_amount: number
+  maximum_withdrawal_amount: number | null
+  daily_payout_limit: number | null
+  second_approval_enabled: boolean
+  second_approval_threshold: number | null
+  require_payment_confirmation: boolean
+  enforce_separation_of_duties: boolean
+  allow_member_cancel: boolean
+  updated_at: string
+  connection: OrgFinanceConnection | null
+  viewer_capabilities: FinanceViewerCapabilities
+}
+
+export interface OrgFinanceGrant {
+  user_id: string
+  full_name: string
+  can_view_finance: boolean
+  can_verify_settlement: boolean
+  can_review_withdrawal: boolean
+  can_approve_withdrawal: boolean
+  can_authorize_payment: boolean
+  can_record_payment: boolean
+  can_confirm_payment: boolean
+  can_manage_reconciliation: boolean
+  approval_limit_amount: number | null
+}
+
+export interface FinanceReconciliation {
+  stuck_authorized: number
+  awaiting_confirmation: number
+  failed: number
+  settled_not_credited: number
+  duplicate_payment_refs: number
+  negative_balances: number
+  paid_without_payout_row: number
 }

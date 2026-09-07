@@ -10,8 +10,14 @@ import type {
   FinanceOrder,
   FinanceOrderStatus,
   FinancePayout,
+  FinancePaymentChannel,
+  FinanceReconciliation,
   MemberPayoutAccount,
   MoneyByCurrency,
+  OrgFinanceConfig,
+  OrgFinanceGrant,
+  WithdrawalMemberStatus,
+  WithdrawalPayment,
   WithdrawalRequest,
   WithdrawalStatus,
 } from '../types/database'
@@ -26,13 +32,53 @@ export const ORDER_STATUS_LABEL: Record<FinanceOrderStatus, string> = {
   cancelled: 'Cancelled',
 }
 
+// Admin / Finance Operations view of the state machine.
 export const WITHDRAWAL_STATUS_LABEL: Record<WithdrawalStatus, string> = {
   requested: 'Requested',
+  under_review: 'Under review',
   approved: 'Approved',
-  processing: 'Processing',
+  authorized_for_payment: 'Authorized for payment',
+  payment_recorded: 'Payment recorded',
   paid: 'Paid',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+  failed: 'Failed',
+  reversed: 'Reversed',
+}
+
+// Member-facing: the internal states collapse to a short, plain set.
+export const WITHDRAWAL_MEMBER_LABEL: Record<WithdrawalMemberStatus, string> = {
+  received: 'Received',
+  processing: 'Processing',
+  paid: 'Paid',
+  not_approved: 'Not approved',
+  returned: 'Returned',
+}
+
+export function withdrawalMemberStatus(s: WithdrawalStatus): WithdrawalMemberStatus {
+  switch (s) {
+    case 'requested':
+    case 'under_review':
+      return 'received'
+    case 'approved':
+    case 'authorized_for_payment':
+    case 'payment_recorded':
+    case 'failed':
+      return 'processing'
+    case 'paid':
+      return 'paid'
+    case 'rejected':
+    case 'cancelled':
+      return 'not_approved'
+    case 'reversed':
+      return 'returned'
+  }
+}
+
+export const PAYMENT_CHANNEL_LABEL: Record<FinancePaymentChannel, string> = {
+  office_bank_transfer: 'Office bank transfer',
+  provider_transfer: 'Provider transfer',
+  other: 'Other approved method',
 }
 
 export const CHARGE_TYPE_LABEL: Record<string, string> = {
@@ -54,7 +100,11 @@ export const LEDGER_TYPE_LABEL: Record<string, string> = {
   withdrawal_reserve: 'Withdrawal requested',
   withdrawal_release: 'Funds returned',
   payout: 'Payout',
+  payout_debit: 'Payout completed',
   adjustment: 'Adjustment',
+  adjustment_credit: 'Manual adjustment (credit)',
+  adjustment_debit: 'Manual adjustment (debit)',
+  reversal: 'Reversal',
 }
 
 export const COMMON_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'GHS', 'KES', 'ZAR', 'CAD']
@@ -80,29 +130,64 @@ export function moneyList(rows: MoneyByCurrency[] | null | undefined): string {
 
 // ---------- reads ----------
 
+const EMPTY_BALANCES: FinanceMemberBalances = {
+  available: [], lifetime_gross: [], total_credited: [], pending_platform: [], pending_withdrawal: [], total_paid_out: [],
+}
+
 export async function loadMemberBalances(orgId: string, memberId: string): Promise<FinanceMemberBalances> {
   const { data, error } = await supabase.rpc('finance_member_balances', { p_org: orgId, p_member: memberId })
   if (error) throw error
-  return (data as FinanceMemberBalances) ?? { available: [], lifetime_gross: [], pending_platform: [], pending_withdrawal: [], total_paid_out: [] }
+  return (data as FinanceMemberBalances) ?? EMPTY_BALANCES
 }
 
-export async function loadOrgOverview(orgId: string, startIso: string, endIso: string) {
+export interface FinanceOrgOverview {
+  orders_in_period: number
+  gross_by_currency: MoneyByCurrency[]
+  pending_platform: MoneyByCurrency[]
+  member_wallet_liability: MoneyByCurrency[]
+  pending_withdrawals_count: number
+  processing_payouts_count: number
+  paid_in_period: MoneyByCurrency[]
+  failed_payouts_count: number
+  needs_attention: {
+    awaiting_settlement: number
+    settled_not_credited: number
+    withdrawals_awaiting_approval: number
+    withdrawals_awaiting_authorization: number
+    withdrawals_awaiting_payment: number
+    withdrawals_awaiting_confirmation: number
+    withdrawals_failed: number
+  }
+}
+
+export async function loadOrgOverview(orgId: string, startIso: string, endIso: string): Promise<FinanceOrgOverview> {
   const { data, error } = await supabase.rpc('finance_org_overview', { p_org: orgId, p_start: startIso, p_end: endIso })
   if (error) throw error
-  return data as {
-    orders_in_period: number
-    gross_by_currency: MoneyByCurrency[]
-    pending_platform: MoneyByCurrency[]
-    available_member_funds: MoneyByCurrency[]
-    pending_withdrawals_count: number
-    paid_in_period: MoneyByCurrency[]
-    needs_attention: {
-      awaiting_settlement: number
-      withdrawals_awaiting_approval: number
-      settled_not_credited: number
-      missing_conversion: number
-    }
-  }
+  return data as FinanceOrgOverview
+}
+
+export async function loadFinanceConfig(orgId: string): Promise<OrgFinanceConfig> {
+  const { data, error } = await supabase.rpc('finance_config_view', { p_org: orgId })
+  if (error) throw error
+  return data as OrgFinanceConfig
+}
+
+export async function loadFinanceGrants(orgId: string): Promise<OrgFinanceGrant[]> {
+  const { data, error } = await supabase.rpc('finance_grants_list', { p_org: orgId })
+  if (error) throw error
+  return (data as OrgFinanceGrant[]) ?? []
+}
+
+export async function loadReconciliation(orgId: string): Promise<FinanceReconciliation> {
+  const { data, error } = await supabase.rpc('finance_reconciliation', { p_org: orgId })
+  if (error) throw error
+  return data as FinanceReconciliation
+}
+
+export async function listWithdrawalPayments(withdrawalId: string): Promise<WithdrawalPayment[]> {
+  const { data } = await supabase.from('withdrawal_payments').select('*')
+    .eq('withdrawal_id', withdrawalId).order('attempt_number')
+  return (data as WithdrawalPayment[]) ?? []
 }
 
 export async function listOrders(orgId: string, opts: { memberId?: string } = {}): Promise<FinanceOrder[]> {
