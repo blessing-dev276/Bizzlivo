@@ -1,5 +1,5 @@
 -- ============================================================
--- 0072 — Events Phase C: audience fan-out + the events-tick cron
+-- 0074 — Events Phase C: audience fan-out + the events-tick cron
 -- ============================================================
 -- Requires pg_cron + pg_net (already enabled on this project) and the
 -- Supabase Vault. Two secrets must be created ONCE by an operator before

@@ -9,7 +9,6 @@ import type {
   FinanceOrder,
   FinancePayout,
   FinancePaymentChannel,
-  FinanceReconciliation,
   OrgFinanceConfig,
   Profile,
   WithdrawalRequest,
@@ -678,38 +677,58 @@ function RecordPaymentModal({
   )
 }
 
-function ReconciliationView({ orgId, onGo }: { orgId: string; onGo: (t: Tab) => void }) {
-  const [r, setR] = useState<FinanceReconciliation | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  useEffect(() => { loadReconciliation(orgId).then(setR).catch((e) => setErr(e.message)) }, [orgId])
-  if (err) return <p className="form-error">{err}</p>
-  if (!r) return <p className="empty-row">Loading…</p>
+const FLAG_LABEL: Record<string, string> = {
+  stuck_in_payment: 'Stuck mid-payment (>48h)',
+  failed_payout: 'Failed payout',
+  paid_without_payout_row: 'Paid without a payout record',
+  negative_balance: 'Negative member balance',
+}
 
-  const rows: { label: string; n: number; hint: string; go?: Tab }[] = [
-    { label: 'Authorized > 48h without payment', n: r.stuck_authorized, hint: 'Payment authorized but not yet recorded', go: 'withdrawals' },
-    { label: 'Payments awaiting confirmation', n: r.awaiting_confirmation, hint: 'Recorded but not confirmed as paid', go: 'withdrawals' },
-    { label: 'Failed payouts', n: r.failed, hint: 'A payment attempt failed and is unresolved', go: 'withdrawals' },
-    { label: 'Settled earnings not credited', n: r.settled_not_credited, hint: 'Settlement recorded, member not yet credited', go: 'orders' },
-    { label: 'Duplicate payment references', n: r.duplicate_payment_refs, hint: 'Same transaction reference used more than once' },
-    { label: 'Negative member balances', n: r.negative_balances, hint: 'A member/currency ledger sums below zero — investigate' },
-    { label: 'Paid without a payout record', n: r.paid_without_payout_row, hint: 'Marked paid but no finance_payouts row exists' },
-  ]
-  const clean = rows.every((x) => x.n === 0)
+function ReconciliationView({ orgId, onGo }: { orgId: string; onGo: (t: Tab) => void }) {
+  const [flags, setFlags] = useState<FinanceReconciliationFlag[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(() => {
+    loadReconciliationFlags(orgId).then(setFlags).catch((e) => setErr(e.message))
+  }, [orgId])
+  useEffect(() => { load() }, [load])
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setErr(null)
+    try { await fn(); load() } catch (e) { setErr(e instanceof Error ? e.message : 'Action failed.') } finally { setBusy(false) }
+  }
 
   return (
     <>
       <p className="md-muted" style={{ marginBottom: 12 }}>
-        Compares Bizzlivo's records against the withdrawal workflow. Nothing here changes money — it flags divergence for a person to resolve.
+        Compares Bizzlivo's records against the withdrawal workflow and any provider transfers. Nothing here moves money —
+        it flags divergence for a person to resolve.
       </p>
-      {clean ? <p className="empty-row">Everything reconciles. No open discrepancies.</p> : (
-        <div className="table-wrap"><table className="data-table">
-          <thead><tr><th>Check</th><th style={{ textAlign: 'right' }}>Count</th><th>What it means</th></tr></thead>
+      <button type="button" className="md-btn ghost sm" disabled={busy} onClick={() => run(() => runReconcileScan(orgId))}>
+        Run reconciliation scan
+      </button>
+      {err && <p className="form-error" style={{ marginTop: 10 }}>{err}</p>}
+
+      {!flags ? <p className="empty-row">Loading…</p> : flags.length === 0 ? (
+        <p className="empty-row" style={{ marginTop: 12 }}>Everything reconciles. No open discrepancies.</p>
+      ) : (
+        <div className="table-wrap" style={{ marginTop: 12 }}><table className="data-table">
+          <thead><tr><th>Flag</th><th>Detail</th><th>First seen</th><th /></tr></thead>
           <tbody>
-            {rows.map((x) => (
-              <tr key={x.label} style={{ cursor: x.go ? 'pointer' : undefined }} onClick={() => x.go && onGo(x.go)}>
-                <td>{x.label}</td>
-                <td style={{ textAlign: 'right', color: x.n > 0 ? 'var(--tint-attn)' : 'var(--tint-ok)', fontWeight: 700 }}>{x.n}</td>
-                <td className="cell-dim">{x.hint}</td>
+            {flags.map((f) => (
+              <tr key={f.id}>
+                <td>{FLAG_LABEL[f.kind] ?? f.kind}</td>
+                <td className="cell-dim">{f.detail ?? '—'}</td>
+                <td className="cell-dim">{new Date(f.first_seen).toLocaleDateString()}</td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {f.entity_type === 'withdrawal' && (
+                    <button type="button" className="btn-ghost" onClick={() => onGo('withdrawals')}>View</button>
+                  )}
+                  <button type="button" className="btn-ghost" disabled={busy} onClick={() => run(() => resolveReconciliationFlag(orgId, f.id))}>
+                    Resolve
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

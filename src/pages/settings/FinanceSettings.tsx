@@ -16,6 +16,7 @@ const GRANT_FIELDS: { key: keyof OrgFinanceGrant; label: string; help: string }[
   { key: 'can_authorize_payment', label: 'Authorize payment', help: 'Release an approved request for the office to pay' },
   { key: 'can_record_payment', label: 'Record payment', help: 'Enter the payment reference after the office pays' },
   { key: 'can_confirm_payment', label: 'Confirm payment', help: 'Second-person confirmation that finalises PAID' },
+  { key: 'can_initiate_payout', label: 'Initiate payout', help: 'Send an automated provider transfer (when enabled)' },
   { key: 'can_manage_reconciliation', label: 'Reconciliation', help: 'Run reconciliation and reverse a paid withdrawal' },
 ]
 
@@ -93,7 +94,9 @@ export default function FinanceSettings() {
             <Field label="Account name">{conn?.settlement_account_name ?? 'Not set'}</Field>
             <Field label="Status"><span className="gl-tag green">Connected</span></Field>
             <Field label="Automated payouts">
-              {cfg.automated_payout_enabled ? 'Enabled' : 'Unavailable — pending provider setup'}
+              {cfg.automation_available ? 'Enabled — provider transfers'
+                : cfg.automated_payout_enabled ? 'On, but the provider connection does not support transfers'
+                : 'Off — payouts are recorded manually'}
             </Field>
           </div>
         )}
@@ -102,11 +105,20 @@ export default function FinanceSettings() {
           busy={busy}
           onSubmit={(patch) => run(() => updateFinanceConnection(orgId, { ...patch, status: 'active' }), 'Finance account updated.')}
         />
-        <p className="set-hint" style={{ marginTop: 10 }}>
-          Automated provider transfers are a later phase and stay disabled until your payment provider confirms the
-          capability for this office's own account. Bizzlivo's subscription billing is separate and is never used to
-          fund payouts.
-        </p>
+        {conn?.capabilities?.supports_transfers ? (
+          <ToggleRow
+            label="Enable automated provider transfers for authorized withdrawals"
+            checked={cfg.automated_payout_enabled}
+            disabled={busy}
+            onChange={(v) => run(() => updateFinanceConfig(orgId, { automated_payout_enabled: v }), 'Updated.')}
+          />
+        ) : (
+          <p className="set-hint" style={{ marginTop: 10 }}>
+            <strong>Automated payouts unavailable.</strong> Your payment provider connection does not currently support
+            transfers, so authorized withdrawals are paid from your office account and the reference recorded here.
+            Bizzlivo's subscription billing is separate and is never used to fund payouts.
+          </p>
+        )}
       </section>
 
       {/* ---- Withdrawal Rules ---- */}
