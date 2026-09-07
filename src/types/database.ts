@@ -1088,6 +1088,10 @@ export interface WithdrawalPayment {
   confirmed_at: string | null
   failure_reason: string | null
   provider_reference: string | null
+  provider_transfer_id: string | null
+  provider_status: string | null
+  response_code: string | null
+  failure_code: string | null
   created_at: string
 }
 
@@ -1154,7 +1158,7 @@ export interface FinanceMemberBalances {
 
 export type FinanceCapability =
   | 'view' | 'verify_settlement' | 'review' | 'approve'
-  | 'authorize' | 'record_payment' | 'confirm_payment' | 'reconcile'
+  | 'authorize' | 'record_payment' | 'confirm_payment' | 'initiate_payout' | 'reconcile'
 
 export interface FinanceViewerCapabilities extends Record<FinanceCapability, boolean> {
   is_admin: boolean
@@ -1195,6 +1199,7 @@ export interface OrgFinanceConfig {
   allow_member_cancel: boolean
   updated_at: string
   connection: OrgFinanceConnection | null
+  automation_available: boolean
   viewer_capabilities: FinanceViewerCapabilities
 }
 
@@ -1208,6 +1213,7 @@ export interface OrgFinanceGrant {
   can_authorize_payment: boolean
   can_record_payment: boolean
   can_confirm_payment: boolean
+  can_initiate_payout: boolean
   can_manage_reconciliation: boolean
   approval_limit_amount: number | null
 }
@@ -1220,4 +1226,17 @@ export interface FinanceReconciliation {
   duplicate_payment_refs: number
   negative_balances: number
   paid_without_payout_row: number
+}
+
+export interface FinanceReconciliationFlag {
+  id: string
+  org_id: string
+  kind: string
+  entity_type: string | null
+  entity_id: string | null
+  detail: string | null
+  status: 'open' | 'resolved'
+  first_seen: string
+  last_seen: string
+  resolved_at: string | null
 }

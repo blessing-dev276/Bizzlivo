@@ -14,6 +14,7 @@ import type {
   FinanceReconciliation,
   MemberPayoutAccount,
   MoneyByCurrency,
+  FinanceReconciliationFlag,
   OrgFinanceConfig,
   OrgFinanceGrant,
   WithdrawalMemberStatus,
@@ -182,6 +183,49 @@ export async function loadReconciliation(orgId: string): Promise<FinanceReconcil
   const { data, error } = await supabase.rpc('finance_reconciliation', { p_org: orgId })
   if (error) throw error
   return data as FinanceReconciliation
+}
+
+// ---- Phase 2: automated payouts + persisted reconciliation ----
+
+/**
+ * Initiate a provider payout for an authorized withdrawal. The browser
+ * never touches the provider — this calls the `finance-payout` Edge
+ * Function, which resolves org / amount / recipient / capability
+ * server-side and holds the secret key.
+ */
+export async function sendPayout(withdrawalId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('finance-payout', {
+    body: { withdrawal_id: withdrawalId },
+  })
+  if (error) {
+    const ctx = (error as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = await ctx.json()
+        if (body?.error) throw new Error(String(body.error))
+      } catch (e) {
+        if (e instanceof Error && e.message) throw e
+      }
+    }
+    throw new Error('Could not start the payout. Please try again.')
+  }
+  if (data && data.ok !== true && data.error) throw new Error(String(data.error))
+}
+
+export async function loadReconciliationFlags(orgId: string): Promise<FinanceReconciliationFlag[]> {
+  const { data } = await supabase.from('finance_reconciliation_flags').select('*')
+    .eq('org_id', orgId).eq('status', 'open').order('last_seen', { ascending: false })
+  return (data as FinanceReconciliationFlag[]) ?? []
+}
+
+export async function runReconcileScan(orgId: string): Promise<void> {
+  const { error } = await supabase.rpc('finance_reconcile_scan', { p_org: orgId })
+  if (error) throw new Error(error.message)
+}
+
+export async function resolveReconciliationFlag(orgId: string, flagId: string): Promise<void> {
+  const { error } = await supabase.rpc('finance_resolve_flag', { p_org: orgId, p_flag: flagId })
+  if (error) throw new Error(error.message)
 }
 
 export async function listWithdrawalPayments(withdrawalId: string): Promise<WithdrawalPayment[]> {

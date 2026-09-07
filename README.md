@@ -33,29 +33,30 @@ supabase functions deploy generate-questions
 supabase functions deploy accept-invite
 supabase functions deploy paystack-webhook
 supabase functions deploy verify-paystack-transaction
-supabase functions deploy register-office-domain
 ```
 
-`register-office-domain` attaches each new office's subdomain
-(`<slug>.bizzlivo.com`) to the Vercel project so it gets its own TLS
-certificate — called best-effort from `completeOfficeSignup`. It needs a
-Vercel access token and the project id as function secrets (and the team
-id if the project sits under a team). Without them it's a safe no-op and
-offices fall back to the path-form login `/o/<slug>/login`:
+### Branded office subdomains (`<slug>.bizzlivo.com`)
 
-```bash
-supabase secrets set VERCEL_TOKEN=xxxxxxxx
-supabase secrets set VERCEL_PROJECT_ID=prj_KGCTBsFMTOWRqSga5C40dtztnkFj
-supabase secrets set VERCEL_TEAM_ID=team_Aiyxj68N4ctKayrChvU989bf
-# optional, defaults to bizzlivo.com:
-# supabase secrets set OFFICE_ROOT_DOMAIN=bizzlivo.com
-```
+One **wildcard domain** on the Vercel project handles every office — no
+per-office registration:
 
-A one-line `*` wildcard CNAME (`* → cname.vercel-dns.com`) must exist in
-DNS so the subdomains resolve; the per-office domain added by this
-function is what provisions the certificate and routing. Do **not** add
-`*.bizzlivo.com` as a domain in Vercel — a wildcard cert can't be issued
-while DNS is hosted off Vercel.
+1. Move `bizzlivo.com` DNS to Vercel: at the registrar, set the domain's
+   nameservers to Vercel's (`ns1.vercel-dns.com`, `ns2.vercel-dns.com`).
+   Re-create every existing record in Vercel's DNS editor first —
+   especially the `notifications.bizzlivo.com` MX/TXT/CNAME records for
+   Resend — so mail keeps flowing through the cutover.
+2. Add **`*.bizzlivo.com`** (and `bizzlivo.com`) as domains on the Vercel
+   project. With DNS on Vercel the wildcard TLS cert is issued
+   automatically.
+3. Set `VITE_OFFICE_SUBDOMAINS=true` in the Vercel project env and
+   redeploy — the app then links offices as `https://<slug>.bizzlivo.com`
+   instead of the path form `/o/<slug>/login` (which still works).
+4. Delete any leftover per-office domain entries in Vercel — they're
+   obsolete.
+
+`register-office-domain` is a **deprecated no-op** kept only so an older
+client build doesn't 404. `completeOfficeSignup` no longer calls it. The
+`VERCEL_*` / `OFFICE_ROOT_DOMAIN` function secrets are no longer used.
 
 `generate-questions` currently calls **Groq** (OpenAI-compatible chat
 completions, `llama-3.3-70b-versatile`) as an interim, cheaper provider —

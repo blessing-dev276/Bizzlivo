@@ -109,19 +109,12 @@ export async function completeOfficeSignup(user: User): Promise<string | null> {
     throw new Error('Could not create your office. Please try signing in again.')
   }
 
-  // Best-effort: attach this office's branded subdomain
-  // (<slug>.bizzlivo.com) to the Vercel project so it gets its own cert
-  // and routes to the app. Idempotent server-side, and a no-op when the
-  // Vercel secrets aren't configured. Not fatal if it fails — the office
-  // still works on the path-form login (/o/<slug>/login) and the
-  // subdomain can be registered later.
-  try {
-    await supabase.functions.invoke('register-office-domain', { body: { orgId } })
-  } catch {
-    // ignored — see comment above
-  }
+  // No per-office domain registration: `*.bizzlivo.com` is a single
+  // wildcard domain on the Vercel project (with a wildcard TLS cert, DNS
+  // hosted on Vercel), so every <slug>.bizzlivo.com just works with no
+  // per-office API call. See README → "Branded office subdomains".
 
-  // Best-effort: a brand-new office gets a 30-day Growth-tier trial with no
+  // Best-effort: a brand-new office gets a 30-day Starter-tier trial with no
   // card required. start_trial() is idempotent (a no-op if a subscription
   // row already exists), matching this function's own resumability — safe
   // to call every time completeOfficeSignup runs. Not fatal if it fails;

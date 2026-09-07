@@ -253,6 +253,7 @@ export default function App() {
           <Route path="/settings/security" element={<Protected><Settings section="security" /></Protected>} />
           <Route path="/settings/office" element={<Protected><Settings section="office" /></Protected>} />
           <Route path="/settings/finance" element={<Protected><Settings section="finance" /></Protected>} />
+          <Route path="/settings/integrations" element={<Protected><Settings section="integrations" /></Protected>} />
           <Route path="/settings/billing" element={<Protected><Settings section="billing" /></Protected>} />
           <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 

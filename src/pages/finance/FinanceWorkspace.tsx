@@ -33,7 +33,7 @@ import {
   listWithdrawals,
   loadFinanceConfig,
   loadOrgOverview,
-  loadReconciliation,
+  loadReconciliationFlags,
   money,
   moneyList,
   previewCredit,
@@ -41,10 +41,14 @@ import {
   recordOrder,
   recordSettlement,
   recordWithdrawalPayment,
+  resolveReconciliationFlag,
   reverseWithdrawal,
   reviewWithdrawal,
+  runReconcileScan,
+  sendPayout,
   voidCharge,
 } from '../../lib/finance'
+import type { FinanceReconciliationFlag } from '../../types/database'
 import { OrderBreakdown, OrderStatusPill, WithdrawalStatusPill } from './shared'
 
 type Tab = 'overview' | 'orders' | 'withdrawals' | 'members' | 'transactions' | 'reconciliation'
@@ -558,8 +562,18 @@ function WithdrawalsQueue({
                 </button>
               )}
 
+              {w.status === 'authorized_for_payment' && cfg.automation_available && caps.initiate_payout && (
+                <button type="button" disabled={busy || restricted} onClick={() => act(() => sendPayout(w.id))}>Send payout</button>
+              )}
               {w.status === 'authorized_for_payment' && caps.record_payment && (
-                <button type="button" disabled={busy || restricted} onClick={() => setPayFor(w)}>Record payment</button>
+                <button
+                  type="button"
+                  className={cfg.automation_available && caps.initiate_payout ? 'btn-ghost' : ''}
+                  disabled={busy || restricted}
+                  onClick={() => setPayFor(w)}
+                >
+                  Record payment{cfg.automation_available ? ' (manual)' : ''}
+                </button>
               )}
 
               {w.status === 'payment_recorded' && caps.confirm_payment && (

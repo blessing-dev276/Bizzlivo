@@ -24,6 +24,7 @@ export default function EventDetail() {
   const [overrides, setOverrides] = useState<EventOccurrence[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (!orgId || !eventId) return
@@ -82,6 +83,23 @@ export default function EventDetail() {
     navigate('/events')
   }
 
+  async function syncGoogle() {
+    setBusy(true); setSyncMsg(null)
+    const { data, error } = await supabase.functions.invoke('google-sync-event', { body: { eventId } })
+    setBusy(false)
+    if (error || data?.error) {
+      setSyncMsg(
+        data?.error === 'not_configured' ? 'Google integration isn’t set up on this deployment.'
+        : data?.error === 'reconnect_required' ? 'Google access needs reconnecting in Settings → Integrations.'
+        : data?.error ?? error?.message ?? 'Sync failed.')
+    } else {
+      setSyncMsg('Synced to Google Calendar.')
+    }
+    // reload the event to reflect sync_status / meeting_url
+    const { data: ev } = await supabase.from('events').select('*').eq('id', eventId).eq('org_id', orgId!).single()
+    setEvent(ev as HQEvent | null)
+  }
+
   return (
     <div className="page" style={{ maxWidth: 640 }}>
       <Link to="/events" style={{ fontSize: 13.5 }}>← Back to Events</Link>
@@ -106,6 +124,19 @@ export default function EventDetail() {
             : (event.venue_location ?? 'Physical')}</dd></div>
           <div><dt>Reminders</dt><dd>{(event.reminder_minutes ?? []).map((m) => m >= 60 ? `${m / 60}h` : `${m}m`).join(', ') || 'None'}{event.email_reminders ? ' · email on' : ''}</dd></div>
         </dl>
+
+        {isAdmin && event.venue_type === 'online' && event.meeting_provider === 'google_meet' && (
+          <div className="set-hint" style={{ marginTop: 12 }}>
+            Google sync: <strong>{event.sync_status === 'synced' ? 'Synced ✓' : event.sync_status === 'sync_failed' ? 'Failed' : event.sync_status === 'syncing' ? 'Syncing…' : 'Not synced'}</strong>
+            {event.sync_error && ` — ${event.sync_error}`}
+            {' · '}
+            <button type="button" className="btn-ghost" disabled={busy} onClick={syncGoogle}>
+              {event.sync_status === 'synced' ? 'Re-sync' : 'Sync to Google'}
+            </button>
+            {event.meeting_url && <> · <a href={event.meeting_url} target="_blank" rel="noreferrer">Meet link</a></>}
+            {syncMsg && <div className="form-info" style={{ marginTop: 6 }}>{syncMsg}</div>}
+          </div>
+        )}
 
         {isAdmin && (
           <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>

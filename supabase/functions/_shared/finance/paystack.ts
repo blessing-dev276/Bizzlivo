@@ -83,19 +83,58 @@ export function createPaystackFinanceProvider(): FinanceProvider {
       return { accountName: String(body.data.account_name) }
     },
 
-    async createTransferRecipient(): Promise<{ recipientCode: string }> {
+    async createTransferRecipient({ accountNumber, bankCode, accountName, currency }): Promise<{ recipientCode: string }> {
       requireCap('supports_transfer_recipients')
-      throw new Error('finance provider: transfer recipients not implemented in Phase 1')
+      const res = await fetch(`${API}/transferrecipient`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'nuban', name: accountName, account_number: accountNumber,
+          bank_code: bankCode, currency: currency.toUpperCase(),
+        }),
+      })
+      const body = await res.json()
+      if (!body?.status || !body.data?.recipient_code) {
+        throw new Error(body?.message ?? 'Could not create the transfer recipient.')
+      }
+      return { recipientCode: String(body.data.recipient_code) }
     },
 
-    async initiateTransfer(): Promise<{ providerTransferId: string; status: TransferStatus }> {
+    async initiateTransfer({ recipientCode, amountMinor, currency, reference, reason }): Promise<{ providerTransferId: string; status: TransferStatus }> {
       requireCap('supports_transfers')
-      throw new Error('finance provider: transfers not implemented in Phase 1')
+      const res = await fetch(`${API}/transfer`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          source: 'balance', amount: amountMinor, currency: currency.toUpperCase(),
+          recipient: recipientCode, reason, reference,
+        }),
+      })
+      const body = await res.json()
+      // A duplicate reference is a success from our side — the transfer already exists.
+      if (!body?.status) {
+        if (String(body?.message ?? '').toLowerCase().includes('duplicate')) {
+          return { providerTransferId: '', status: 'pending' }
+        }
+        throw new Error(body?.message ?? 'Could not initiate the transfer.')
+      }
+      const s = String(body.data?.status ?? 'pending')
+      return {
+        providerTransferId: body.data?.transfer_code != null ? String(body.data.transfer_code) : '',
+        status: s === 'success' ? 'success' : s === 'failed' ? 'failed' : s === 'reversed' ? 'reversed' : 'pending',
+      }
     },
 
-    async getTransferStatus(): Promise<{ status: TransferStatus; raw: unknown }> {
+    async getTransferStatus(reference: string): Promise<{ status: TransferStatus; raw: unknown }> {
       requireCap('supports_transfers')
-      throw new Error('finance provider: transfers not implemented in Phase 1')
+      const res = await fetch(`${API}/transfer/verify/${encodeURIComponent(reference)}`, { headers: auth })
+      const body = await res.json()
+      const s = String(body?.data?.status ?? 'unknown')
+      return {
+        status: s === 'success' ? 'success' : s === 'failed' ? 'failed' : s === 'reversed' ? 'reversed'
+          : s === 'pending' || s === 'otp' || s === 'processing' ? 'pending' : 'unknown',
+        raw: body?.data ?? null,
+      }
     },
 
     async verifyWebhook(rawBody: string, headers: Headers): Promise<boolean> {

@@ -6,11 +6,12 @@ import OfficeSettings from './OfficeSettings'
 import NotificationSettings from './NotificationSettings'
 import SecuritySettings from './SecuritySettings'
 import FinanceSettings from './FinanceSettings'
+import IntegrationsSettings from './IntegrationsSettings'
 import MembershipDanger from './MembershipDanger'
 
 const ADMIN_ROLES = new Set(['admin'])
 
-export type SettingsSection = 'profile' | 'notifications' | 'security' | 'office' | 'billing' | 'finance'
+export type SettingsSection = 'profile' | 'notifications' | 'security' | 'office' | 'billing' | 'finance' | 'integrations'
 
 // Each settings section is its own page now, reached at /settings/<section>.
 // This one component renders whichever section the route asks for; admin-only
@@ -19,7 +20,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
   const { currentMembership } = useAuth()
   const isAdmin = currentMembership ? ADMIN_ROLES.has(currentMembership.role) : false
 
-  if ((section === 'office' || section === 'billing' || section === 'finance') && !isAdmin) {
+  if ((section === 'office' || section === 'billing' || section === 'finance' || section === 'integrations') && !isAdmin) {
     return <Navigate to="/settings/profile" replace />
   }
 
@@ -36,6 +37,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
       {section === 'office' && <OfficeSettings />}
       {section === 'billing' && <Billing />}
       {section === 'finance' && <FinanceSettings />}
+      {section === 'integrations' && <IntegrationsSettings />}
     </div>
   )
 }
