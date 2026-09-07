@@ -227,7 +227,19 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'System',
     items: [
-      { to: '/settings', icon: I.settings, label: 'Settings' },
+      {
+        group: true,
+        icon: I.settings,
+        label: 'Settings',
+        paths: ['/settings'],
+        children: [
+          { to: '/settings', icon: I.profile, label: 'Profile', end: true },
+          { to: '/settings?tab=notifications', icon: I.megaphone, label: 'Notifications' },
+          { to: '/settings?tab=security', icon: I.settings, label: 'Account & Security' },
+          { to: '/settings?tab=office', icon: I.myTeam, label: 'Office', show: (c) => c.isAdmin },
+          { to: '/settings?tab=billing', icon: I.wallet, label: 'Billing & Plan', show: (c) => c.isAdmin },
+        ],
+      },
       { to: '/help', icon: I.help, label: 'Help & Support' },
     ],
   },

@@ -19,8 +19,8 @@ export default function Settings() {
   const [params] = useSearchParams()
   const tab = params.get('tab')
   useEffect(() => {
-    if (!tab) return
-    document.getElementById(`settings-${tab}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const target = document.getElementById(`settings-${tab ?? 'profile'}`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [tab])
 
   return (
