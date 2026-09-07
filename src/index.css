@@ -1915,7 +1915,8 @@ td {
 .usage-bar-fill.attn { background: var(--coral); }
 
 /* --- monthly / yearly --- */
-.billing-cycle-row { display: flex; justify-content: center; margin: 6px 0 20px; scroll-margin-top: 20px; }
+.billing-cycle-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 6px 0 20px; scroll-margin-top: 20px; }
+.provider-toggle { font-size: 0.9em; }
 .cycle-toggle { display: inline-flex; background: var(--line-soft); border: 1px solid var(--line); border-radius: 100px; padding: 4px; gap: 2px; }
 .cycle-toggle button {
   display: inline-flex; align-items: center; gap: 8px;

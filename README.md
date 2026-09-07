@@ -100,24 +100,52 @@ as described above.
 `vercel.json` rewrites all paths to `/index.html` so React Router's client-side
 routes work on hard refresh/deep links, and sets asset caching / security headers.
 
-## 7. Billing (Paystack)
+## 7. Billing (Paystack / Flutterwave)
 
-Free / Growth / Business plans, monthly or yearly, checked out via
-Paystack's inline popup. Pricing and limits live in the `plan_limits` table
+Free / Growth / Business plans, monthly or yearly, checked out via an
+inline popup. Pricing and limits live in the `plan_limits` table
 (migration `0010_billing.sql`), not hardcoded in the frontend — change a
 price or a cap with a single `UPDATE`, no redeploy needed.
 
-1. Create a Paystack account (test mode is fine to start) and grab your
-   **Public Key** and **Secret Key** from Settings → API Keys & Webhooks.
-2. Frontend: set `VITE_PAYSTACK_PUBLIC_KEY` in `.env`.
-3. Edge Functions: set the secret key (also used to verify the webhook's
-   HMAC-SHA512 signature — no separate hash to invent, unlike some other
-   providers):
+Two providers are supported and share the same flow: an inline checkout,
+a same-request `verify-<provider>-transaction` call for instant UI, and a
+durable `<provider>-webhook`. `activatePaidPlan()` (in
+`_shared/paystack.ts`) is the provider-neutral "mark it paid" step and is
+idempotent on `provider_ref`. If both public keys are set the admin picks
+a provider at checkout; if only one is set it's used silently; if neither,
+the upgrade buttons report that payments aren't configured.
+
+### Paystack
+
+1. Create a Paystack account (test mode is fine) and grab your **Public
+   Key** and **Secret Key** from Settings → API Keys & Webhooks.
+2. Frontend: set `VITE_PAYSTACK_PUBLIC_KEY` in `.env` (and in Vercel).
+3. Edge Functions: `supabase secrets set PAYSTACK_SECRET_KEY=sk_test_...`
+   (also used to verify the webhook's HMAC-SHA512 signature).
+4. In Paystack's dashboard set the webhook URL to your deployed
+   `paystack-webhook` function URL.
+
+### Flutterwave (optional)
+
+1. From the Flutterwave dashboard → Settings → API Keys, grab the
+   **Public key** (`FLWPUBK...`) and **Secret key** (`FLWSECK...`).
+2. Frontend: set `VITE_FLUTTERWAVE_PUBLIC_KEY` in `.env` (and in Vercel).
+3. Edge Functions:
    ```bash
-   supabase secrets set PAYSTACK_SECRET_KEY=sk_test_...
+   supabase secrets set FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-...
+   supabase secrets set FLUTTERWAVE_WEBHOOK_HASH=<any-random-string>
+   supabase functions deploy verify-flutterwave-transaction
+   supabase functions deploy flutterwave-webhook
    ```
-4. In Paystack's dashboard (Settings → API Keys & Webhooks), set the
-   webhook URL to your deployed `paystack-webhook` function's URL.
+4. In Flutterwave's dashboard → Settings → Webhooks, set the URL to your
+   deployed `flutterwave-webhook` function and set the **Secret hash** to
+   the exact same string you used for `FLUTTERWAVE_WEBHOOK_HASH` (it's
+   sent back verbatim in the `verif-hash` header — Flutterwave doesn't
+   HMAC-sign the body).
+
+Flutterwave quotes amounts in major units (naira); the checkout passes
+`amountKobo / 100` and the verify path multiplies back up before
+`activatePaidPlan` re-checks the price against `plan_limits`.
 
 ### Notes on billing scope
 

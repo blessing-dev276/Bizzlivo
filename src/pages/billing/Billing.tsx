@@ -3,6 +3,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { openPaystackCheckout } from '../../lib/paystack'
+import { openFlutterwaveCheckout } from '../../lib/flutterwave'
 import { fetchPlanLimits, trialDaysLeft, useOrgUsage } from '../../lib/plans'
 import {
   PLAN_META,
@@ -18,6 +19,10 @@ import {
 import type { BillingCycle, PlanLimits, PlanTier, PaymentEvent } from '../../types/database'
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined
+const FLUTTERWAVE_PUBLIC_KEY = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY as string | undefined
+
+type PaymentProvider = 'paystack' | 'flutterwave'
+const PROVIDER_LABEL: Record<PaymentProvider, string> = { paystack: 'Paystack', flutterwave: 'Flutterwave' }
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -52,6 +57,16 @@ export default function Billing() {
   const { usage, loading: usageLoading, refresh: refreshUsage } = useOrgUsage(orgId)
   const [limits, setLimits] = useState<PlanLimits[]>([])
   const [cycle, setCycle] = useState<BillingCycle>('monthly')
+  const availableProviders = useMemo<PaymentProvider[]>(() => {
+    const list: PaymentProvider[] = []
+    if (PAYSTACK_PUBLIC_KEY) list.push('paystack')
+    if (FLUTTERWAVE_PUBLIC_KEY) list.push('flutterwave')
+    return list
+  }, [])
+  const [provider, setProvider] = useState<PaymentProvider>(availableProviders[0] ?? 'paystack')
+  useEffect(() => {
+    if (availableProviders.length && !availableProviders.includes(provider)) setProvider(availableProviders[0])
+  }, [availableProviders, provider])
   const [payments, setPayments] = useState<PaymentEvent[]>([])
   const [checkoutPlan, setCheckoutPlan] = useState<PlanTier | null>(null)
   const [busy, setBusy] = useState(false)
@@ -76,12 +91,36 @@ export default function Billing() {
 
   const limitByPlan = useMemo(() => new Map(limits.map((l) => [l.plan, l])), [limits])
 
+  // Confirm a just-completed checkout with the matching verify-* function,
+  // so the UI flips to "active" without waiting on the webhook (which still
+  // fires independently — activatePaidPlan is idempotent on provider_ref).
+  async function confirmPayment(fn: string, body: Record<string, unknown>, plan: Exclude<PlanTier, 'free'>) {
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke(fn, { body })
+      if (fnError) {
+        if (fnError instanceof FunctionsHttpError) {
+          const errBody = await fnError.context.json().catch(() => null)
+          throw new Error(errBody?.error ?? fnError.message)
+        }
+        throw fnError
+      }
+      if (data?.error) throw new Error(data.error)
+      setNotice(`You're now on the ${PLAN_META[plan].label} plan.`)
+      await refreshUsage()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not confirm the payment. Contact support with your transaction reference.')
+    } finally {
+      setCheckoutPlan(null)
+    }
+  }
+
   async function handleUpgrade(plan: Exclude<PlanTier, 'free'>) {
     if (!orgId || !profile) return
-    if (!PAYSTACK_PUBLIC_KEY) {
-      setError('Payments are not configured yet (missing Paystack public key).')
+    if (availableProviders.length === 0) {
+      setError('Payments are not configured yet (no payment provider key set).')
       return
     }
+    const useProvider = availableProviders.includes(provider) ? provider : availableProviders[0]
     const pl = limitByPlan.get(plan)
     if (!pl) return
 
@@ -90,38 +129,37 @@ export default function Billing() {
     setCheckoutPlan(plan)
     const amountKobo = cycle === 'monthly' ? pl.price_monthly_kobo : pl.price_yearly_kobo
     const reference = `bizzlivo-${orgId}-${plan}-${cycle}-${Date.now()}`
+    const meta = { org_id: orgId, plan, billing_cycle: cycle }
 
     try {
-      await openPaystackCheckout({
-        key: PAYSTACK_PUBLIC_KEY,
-        ref: reference,
-        amount: amountKobo,
-        currency: 'NGN',
-        email: profile.email ?? '',
-        metadata: { org_id: orgId, plan, billing_cycle: cycle },
-        callback: async (response) => {
-          try {
-            const { data, error: fnError } = await supabase.functions.invoke('verify-paystack-transaction', {
-              body: { reference: response.reference },
-            })
-            if (fnError) {
-              if (fnError instanceof FunctionsHttpError) {
-                const body = await fnError.context.json().catch(() => null)
-                throw new Error(body?.error ?? fnError.message)
-              }
-              throw fnError
-            }
-            if (data?.error) throw new Error(data.error)
-            setNotice(`You're now on the ${PLAN_META[plan].label} plan.`)
-            await refreshUsage()
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Could not confirm the payment. Contact support with your transaction reference.')
-          } finally {
-            setCheckoutPlan(null)
-          }
-        },
-        onClose: () => setCheckoutPlan(null),
-      })
+      if (useProvider === 'flutterwave') {
+        await openFlutterwaveCheckout({
+          publicKey: FLUTTERWAVE_PUBLIC_KEY!,
+          txRef: reference,
+          amount: amountKobo / 100, // Flutterwave takes major units
+          currency: 'NGN',
+          email: profile.email ?? '',
+          meta,
+          description: `Bizzlivo ${PLAN_META[plan].label} plan (${cycle})`,
+          callback: (response) => {
+            void confirmPayment('verify-flutterwave-transaction', { transactionId: response.transaction_id }, plan)
+          },
+          onClose: () => setCheckoutPlan(null),
+        })
+      } else {
+        await openPaystackCheckout({
+          key: PAYSTACK_PUBLIC_KEY!,
+          ref: reference,
+          amount: amountKobo,
+          currency: 'NGN',
+          email: profile.email ?? '',
+          metadata: meta,
+          callback: (response) => {
+            void confirmPayment('verify-paystack-transaction', { reference: response.reference }, plan)
+          },
+          onClose: () => setCheckoutPlan(null),
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open checkout.')
       setCheckoutPlan(null)
@@ -273,6 +311,15 @@ export default function Billing() {
             Yearly<span className="cycle-save">Save 2 months</span>
           </button>
         </div>
+        {availableProviders.length > 1 && (
+          <div className="cycle-toggle provider-toggle">
+            {availableProviders.map((p) => (
+              <button key={p} type="button" className={provider === p ? 'active' : ''} onClick={() => setProvider(p)}>
+                {PROVIDER_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="plan-cards" role="list">

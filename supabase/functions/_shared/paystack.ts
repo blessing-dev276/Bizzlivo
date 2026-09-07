@@ -1,13 +1,17 @@
-// Shared by paystack-webhook and verify-paystack-transaction: both paths
-// end with the same "a Paystack transaction was confirmed successful, now
-// make it true in our database" step, so it lives in one place instead of
-// being duplicated (and drifting) across two functions.
+// Shared by the payment-provider functions (paystack-webhook /
+// verify-paystack-transaction / flutterwave-webhook /
+// verify-flutterwave-transaction): every path ends with the same "a
+// transaction was confirmed successful, now make it true in our database"
+// step, so it lives in one place instead of being duplicated (and
+// drifting) across four functions. Provider-specific verification lives in
+// paystack.ts / flutterwave.ts; activatePaidPlan below is provider-neutral.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 const PLAN_CODES = ['free', 'growth', 'business'] as const
 export type PlanCode = (typeof PLAN_CODES)[number]
 export type BillingCycle = 'monthly' | 'yearly'
+export type PaymentProvider = 'paystack' | 'flutterwave'
 
 export interface PaystackVerifyResponse {
   status: boolean
@@ -57,6 +61,7 @@ export async function activatePaidPlan(
     currency: string
     providerRef: string
     providerCustomerId: string | null
+    provider?: PaymentProvider
   },
 ): Promise<{ alreadyProcessed: boolean }> {
   const { data: existingEvent } = await db
@@ -91,7 +96,7 @@ export async function activatePaidPlan(
         org_id: params.orgId,
         plan: params.plan,
         status: 'active',
-        provider: 'paystack',
+        provider: params.provider ?? 'paystack',
         provider_customer_id: params.providerCustomerId,
         billing_cycle: params.billingCycle,
         amount_kobo: params.amountKobo,
