@@ -1,9 +1,9 @@
 // Resolves an office's slug from a wildcard subdomain, e.g.
 // "blaze-office.bizzlivo.com" -> "blaze-office". Requires a wildcard DNS
-// record (*.bizzlivo.com) + a matching domain on the Netlify site for
-// that subdomain to actually route — this just reads whatever hostname
-// the browser already landed on. The bare apex / www serves the
-// marketing + generic login (returns null).
+// record (*.bizzlivo.com) + the `*.bizzlivo.com` domain added to the
+// Vercel project for that subdomain to actually route — this just reads
+// whatever hostname the browser already landed on. The bare apex / www
+// serves the marketing + generic login (returns null).
 const ROOT_DOMAIN = 'bizzlivo.com'
 const RESERVED_SUBDOMAINS = new Set([
   'www', 'app', 'admin', 'api', 'mail', 'notifications', 'staging', 'assets', 'cdn', 'static',
@@ -18,7 +18,7 @@ export function getOfficeSlugFromHost(hostname: string): string | null {
 }
 
 // Are per-office subdomains live? True when the build opts in
-// (VITE_OFFICE_SUBDOMAINS=true, set once the Netlify wildcard domain
+// (VITE_OFFICE_SUBDOMAINS=true, set once the Vercel wildcard domain
 // *.bizzlivo.com is active) OR when the app is *already* being served
 // from an office subdomain (proof the wildcard resolves).
 export function officeSubdomainsEnabled(): boolean {
