@@ -1,21 +1,23 @@
-// Supabase Edge Function (Deno): backs the "Add payout account" form in the
+// Supabase Edge Function (Deno): backs the "Payout Account" form in the
 // wallet. Two jobs, picked by the request body:
 //
 //   { action: 'banks' }
-//     -> { banks: [{ name, code }] }  — every Nigerian bank Paystack knows,
-//        sorted by name. Cached for the life of the (warm) instance.
+//     -> { banks: [{ name, code }] }  — every Nigerian bank the finance
+//        provider knows, sorted by name. Cached for the warm instance.
 //
 //   { action: 'resolve', account_number, bank_code }
-//     -> { account_name }             — Paystack NUBAN resolution, so the
+//     -> { account_name }             — provider NUBAN resolution, so the
 //        account name is confirmed from the number and never typed by hand.
 //
-// Requires a valid Supabase session (Authorization header). Uses the same
-// PAYSTACK_SECRET_KEY as the billing functions.
+// Requires a valid Supabase session. Delegates to the FinanceProvider
+// abstraction (_shared/finance) so another licensed provider can be added
+// later without touching this endpoint.
 //
 // Required secrets: PAYSTACK_SECRET_KEY
 // Auto-provided: SUPABASE_URL, SUPABASE_ANON_KEY
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getFinanceProvider } from '../_shared/finance/index.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,45 +26,6 @@ const corsHeaders = {
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-}
-
-interface Bank {
-  name: string
-  code: string
-}
-
-// Populated on first successful fetch, reused while the instance stays warm.
-let bankCache: Bank[] | null = null
-
-async function fetchNigerianBanks(secretKey: string): Promise<Bank[]> {
-  if (bankCache) return bankCache
-  const seen = new Map<string, string>() // code -> name (dedupes across pages)
-  let next: string | null = 'https://api.paystack.co/bank?country=nigeria&currency=NGN&use_cursor=true&perPage=100'
-
-  while (next) {
-    const res: Response = await fetch(next, { headers: { Authorization: `Bearer ${secretKey}` } })
-    const body = await res.json()
-    if (!body?.status || !Array.isArray(body.data)) break
-    for (const b of body.data) {
-      if (b?.code && b?.name && !seen.has(b.code)) seen.set(b.code, b.name)
-    }
-    const cursor = body.meta?.next
-    next = cursor ? `https://api.paystack.co/bank?country=nigeria&currency=NGN&use_cursor=true&perPage=100&next=${encodeURIComponent(cursor)}` : null
-  }
-
-  const banks = [...seen.entries()]
-    .map(([code, name]) => ({ code, name }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-  if (banks.length > 0) bankCache = banks
-  return banks
-}
-
-async function resolveAccount(secretKey: string, accountNumber: string, bankCode: string): Promise<string | null> {
-  const url = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${secretKey}` } })
-  const body = await res.json()
-  if (!body?.status || !body.data?.account_name) return null
-  return String(body.data.account_name)
 }
 
 Deno.serve(async (req) => {
@@ -74,18 +37,26 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!secretKey) return jsonResponse({ error: 'Server misconfigured: PAYSTACK_SECRET_KEY not set.' }, 500)
 
     const callerClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
     const { data: userData, error: userError } = await callerClient.auth.getUser()
     if (userError || !userData.user) return jsonResponse({ error: 'Invalid or expired session.' }, 401)
 
+    let provider
+    try {
+      provider = getFinanceProvider('paystack')
+    } catch {
+      return jsonResponse({ error: 'Server misconfigured: finance provider not set up.' }, 500)
+    }
+    if (!provider.capabilities().supports_bank_resolution) {
+      return jsonResponse({ error: 'Bank verification is not available for this office.' }, 503)
+    }
+
     const body = await req.json().catch(() => ({}))
     const action = body?.action
 
     if (action === 'banks') {
-      const banks = await fetchNigerianBanks(secretKey)
+      const banks = await provider.listBanks('nigeria')
       if (banks.length === 0) return jsonResponse({ error: 'Could not load the bank list. Please try again.' }, 502)
       return jsonResponse({ banks })
     }
@@ -96,11 +67,12 @@ Deno.serve(async (req) => {
       if (!/^\d{10}$/.test(accountNumber)) return jsonResponse({ error: 'Enter a valid 10-digit account number.' }, 400)
       if (!bankCode) return jsonResponse({ error: 'Select a bank first.' }, 400)
 
-      const accountName = await resolveAccount(secretKey, accountNumber, bankCode)
-      if (!accountName) {
-        return jsonResponse({ error: 'We could not verify that account. Check the number and bank.' }, 422)
+      try {
+        const { accountName } = await provider.verifyBankAccount({ accountNumber, bankCode })
+        return jsonResponse({ account_name: accountName })
+      } catch (e) {
+        return jsonResponse({ error: e instanceof Error ? e.message : 'We could not verify that account.' }, 422)
       }
-      return jsonResponse({ account_name: accountName })
     }
 
     return jsonResponse({ error: 'Unknown action.' }, 400)

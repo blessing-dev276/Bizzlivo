@@ -94,5 +94,14 @@ export const clearPlanOverride = (orgId: string) =>
 export const extendTrial = (orgId: string, days: number, reason: string) =>
   supabase.rpc('platform_extend_trial', { p_org: orgId, p_days: days, p_reason: reason })
 
+/**
+ * Permanently deletes an organization and every row that references it
+ * (members, training, finance, goals, ledger, audit). Irreversible.
+ * Super-admin only; `confirm` must equal the org's slug exactly. A
+ * record is kept in platform_org_deletions.
+ */
+export const deleteOrgPermanently = (orgId: string, confirm: string, reason: string) =>
+  supabase.rpc('platform_delete_org', { p_org: orgId, p_confirm: confirm, p_reason: reason })
+
 export const STATUS_TONE = (s: string) =>
   s === 'active' || s === 'sent' ? 'green' : s === 'suspended' || s === 'failed' || s === 'past_due' ? 'red' : s === 'pending' || s === 'trialing' ? 'amber' : 'muted'

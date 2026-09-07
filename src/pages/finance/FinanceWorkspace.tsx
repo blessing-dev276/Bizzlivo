@@ -8,6 +8,8 @@ import type {
   FinanceLedgerEntry,
   FinanceOrder,
   FinancePayout,
+  FinancePaymentChannel,
+  OrgFinanceConfig,
   Profile,
   WithdrawalRequest,
 } from '../../types/database'
@@ -15,43 +17,52 @@ import {
   CHARGE_TYPE_LABEL,
   COMMON_CURRENCIES,
   LEDGER_TYPE_LABEL,
+  PAYMENT_CHANNEL_LABEL,
   addCharge,
+  authorizeWithdrawal,
   cancelOrder,
   clearConversion,
+  confirmWithdrawalPayment,
   creditAvailable,
+  failWithdrawal,
   listCharges,
   listLedger,
   listOrders,
   listPayouts,
   listWithdrawals,
+  loadFinanceConfig,
   loadOrgOverview,
-  markWithdrawalPaid,
+  loadReconciliation,
   money,
   moneyList,
   previewCredit,
   recordConversion,
   recordOrder,
   recordSettlement,
+  recordWithdrawalPayment,
+  reverseWithdrawal,
   reviewWithdrawal,
-  setWithdrawalProcessing,
   voidCharge,
 } from '../../lib/finance'
+import type { FinanceReconciliation } from '../../lib/finance'
 import { OrderBreakdown, OrderStatusPill, WithdrawalStatusPill } from './shared'
 
-type Tab = 'overview' | 'orders' | 'withdrawals' | 'members' | 'transactions'
+type Tab = 'overview' | 'orders' | 'withdrawals' | 'members' | 'transactions' | 'reconciliation'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
-  { key: 'orders', label: 'Orders' },
+  { key: 'orders', label: 'Earnings' },
   { key: 'withdrawals', label: 'Withdrawals' },
   { key: 'members', label: 'Members' },
   { key: 'transactions', label: 'Transactions' },
+  { key: 'reconciliation', label: 'Reconciliation' },
 ]
 
 export default function FinanceWorkspace() {
   const { currentMembership } = useAuth()
   const orgId = currentMembership?.organization.id
-  const role = currentMembership?.role
   const [tab, setTab] = useState<Tab>('overview')
+  const [cfg, setCfg] = useState<OrgFinanceConfig | null>(null)
+  const [denied, setDenied] = useState(false)
   const [members, setMembers] = useState<Profile[]>([])
   const [orders, setOrders] = useState<FinanceOrder[]>([])
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([])
@@ -66,6 +77,9 @@ export default function FinanceWorkspace() {
     if (!orgId) return
     setLoading(true)
     try {
+      const config = await loadFinanceConfig(orgId)
+      setCfg(config)
+      if (!config.viewer_capabilities.view) { setDenied(true); setLoading(false); return }
       const [m, o, w, l, p] = await Promise.all([
         supabase.from('memberships').select('profile:profiles(*)').eq('org_id', orgId).eq('status', 'active').returns<{ profile: Profile }[]>(),
         listOrders(orgId),
@@ -85,39 +99,44 @@ export default function FinanceWorkspace() {
 
   const memberName = useCallback((id: string) => members.find((m) => m.id === id)?.full_name ?? 'Member', [members])
 
-  if (role && role !== 'admin') return <Navigate to="/wallet" replace />
   if (!orgId) return null
+  if (denied) return <Navigate to="/wallet" replace />
+  const caps = cfg?.viewer_capabilities
 
   return (
     <div className="page fin">
       <div className="lc-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1>Finance</h1>
-          <p>Verified office earnings, settlements, and member payouts — a transparent ledger, not an editable balance.</p>
+          <h1>Finance Operations</h1>
+          <p>Verified office earnings, settlements, and member payouts — a transparent ledger, not an editable balance. The office pays each authorized withdrawal from its own financial account.</p>
+          {cfg?.finance_status === 'restricted' && (
+            <p className="form-error">Finance is restricted{cfg.finance_status_reason ? ` — ${cfg.finance_status_reason}` : ''}. Payouts cannot be initiated.</p>
+          )}
         </div>
-        <button type="button" className="md-btn" onClick={() => setShowRecord(true)}>Record order</button>
+        {caps?.verify_settlement && <button type="button" className="md-btn" onClick={() => setShowRecord(true)}>Record earning</button>}
       </div>
       {error && <p className="form-error">{error}</p>}
 
       <div className="view-tabs" style={{ marginBottom: 18 }}>
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.key !== 'reconciliation' || caps?.reconcile).map((t) => (
           <button key={t.key} type="button" className={`view-tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
       </div>
 
-      {loading ? <p className="empty-row">Loading…</p> : (
+      {loading || !cfg ? <p className="empty-row">Loading…</p> : (
         <>
           {tab === 'overview' && <Overview orgId={orgId} orders={orders} withdrawals={withdrawals} onGo={setTab} />}
           {tab === 'orders' && (
             <OrdersTable orders={orders} memberName={memberName} onOpen={setOpenOrder} />
           )}
           {tab === 'withdrawals' && (
-            <WithdrawalsQueue withdrawals={withdrawals} memberName={memberName} onChange={reload} onErr={setError} />
+            <WithdrawalsQueue withdrawals={withdrawals} memberName={memberName} cfg={cfg} onChange={reload} onErr={setError} />
           )}
           {tab === 'members' && (
             <MembersView orgId={orgId} members={members} orders={orders} withdrawals={withdrawals} payouts={payouts} onOpen={setOpenOrder} />
           )}
           {tab === 'transactions' && <TransactionsTable ledger={ledger} orders={orders} memberName={memberName} />}
+          {tab === 'reconciliation' && caps?.reconcile && <ReconciliationView orgId={orgId} onGo={setTab} />}
         </>
       )}
 
@@ -156,27 +175,35 @@ function Overview({
   }, [orgId])
 
   const na = ov?.needs_attention
+  const attnTotal = na
+    ? na.awaiting_settlement + na.settled_not_credited + na.withdrawals_awaiting_approval
+      + na.withdrawals_awaiting_authorization + na.withdrawals_awaiting_payment
+      + na.withdrawals_awaiting_confirmation + na.withdrawals_failed
+    : 0
   return (
     <>
       <div className="fin-balances">
-        <Card label="Orders This Month" value={String(ov?.orders_in_period ?? '—')} />
-        <Card label="Gross Order Value (mo)" value={moneyList(ov?.gross_by_currency)} />
+        <Card label="Member Wallet Liabilities" value={moneyList(ov?.member_wallet_liability)} tone="primary" />
         <Card label="Pending Platform Funds" value={moneyList(ov?.pending_platform)} tone="events" />
-        <Card label="Available Member Funds" value={moneyList(ov?.available_member_funds)} tone="ok" />
-        <Card label="Pending Withdrawal Requests" value={String(ov?.pending_withdrawals_count ?? '—')} tone="primary" />
-        <Card label="Paid Out This Month" value={moneyList(ov?.paid_in_period)} />
+        <Card label="Pending Withdrawals" value={String(ov?.pending_withdrawals_count ?? '—')} />
+        <Card label="Processing Payouts" value={String(ov?.processing_payouts_count ?? '—')} />
+        <Card label="Paid This Month" value={moneyList(ov?.paid_in_period)} tone="ok" />
+        <Card label="Failed Payouts" value={String(ov?.failed_payouts_count ?? '—')} />
       </div>
 
       <section className="fin-section">
         <h4 className="overview-heading">NEEDS ATTENTION</h4>
-        {!na || (na.awaiting_settlement + na.withdrawals_awaiting_approval + na.settled_not_credited + na.missing_conversion === 0) ? (
+        {!na || attnTotal === 0 ? (
           <p className="empty-row">Nothing needs attention right now.</p>
         ) : (
           <ul className="fin-attn">
-            {na.awaiting_settlement > 0 && <li><button type="button" onClick={() => onGo('orders')}>{na.awaiting_settlement} order{na.awaiting_settlement === 1 ? '' : 's'} awaiting settlement</button></li>}
-            {na.settled_not_credited > 0 && <li><button type="button" onClick={() => onGo('orders')}>{na.settled_not_credited} settled order{na.settled_not_credited === 1 ? '' : 's'} not yet credited</button></li>}
-            {na.missing_conversion > 0 && <li><button type="button" onClick={() => onGo('orders')}>{na.missing_conversion} transaction{na.missing_conversion === 1 ? '' : 's'} missing conversion information</button></li>}
-            {na.withdrawals_awaiting_approval > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_approval} withdrawal request{na.withdrawals_awaiting_approval === 1 ? '' : 's'} awaiting approval</button></li>}
+            {na.awaiting_settlement > 0 && <li><button type="button" onClick={() => onGo('orders')}>{na.awaiting_settlement} earning{na.awaiting_settlement === 1 ? '' : 's'} awaiting settlement</button></li>}
+            {na.settled_not_credited > 0 && <li><button type="button" onClick={() => onGo('orders')}>{na.settled_not_credited} settled earning{na.settled_not_credited === 1 ? '' : 's'} not yet credited</button></li>}
+            {na.withdrawals_awaiting_approval > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_approval} withdrawal{na.withdrawals_awaiting_approval === 1 ? '' : 's'} awaiting approval</button></li>}
+            {na.withdrawals_awaiting_authorization > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_authorization} awaiting authorization for payment</button></li>}
+            {na.withdrawals_awaiting_payment > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_payment} authorized — payment to be recorded</button></li>}
+            {na.withdrawals_awaiting_confirmation > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_confirmation} payment{na.withdrawals_awaiting_confirmation === 1 ? '' : 's'} awaiting confirmation</button></li>}
+            {na.withdrawals_failed > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_failed} failed payout{na.withdrawals_failed === 1 ? '' : 's'} to resolve</button></li>}
           </ul>
         )}
       </section>
@@ -452,12 +479,30 @@ function ChargeForm({ order, busy, onSubmit }: {
 
 // ---------------- Withdrawals queue ----------------
 
+const WD_FILTERS: { key: string; label: string; match: (w: WithdrawalRequest) => boolean }[] = [
+  { key: 'needs_approval', label: 'Needs approval', match: (w) => w.status === 'requested' || w.status === 'under_review' },
+  { key: 'needs_authorization', label: 'Needs authorization', match: (w) => w.status === 'approved' },
+  { key: 'needs_payment', label: 'Awaiting payment', match: (w) => w.status === 'authorized_for_payment' },
+  { key: 'needs_confirmation', label: 'Awaiting confirmation', match: (w) => w.status === 'payment_recorded' },
+  { key: 'failed', label: 'Failed', match: (w) => w.status === 'failed' },
+  { key: 'paid', label: 'Paid', match: (w) => w.status === 'paid' },
+  { key: 'closed', label: 'Rejected / Cancelled', match: (w) => w.status === 'rejected' || w.status === 'cancelled' || w.status === 'reversed' },
+  { key: 'all', label: 'All', match: () => true },
+]
+
 function WithdrawalsQueue({
-  withdrawals, memberName, onChange, onErr,
-}: { withdrawals: WithdrawalRequest[]; memberName: (id: string) => string; onChange: () => void; onErr: (m: string) => void }) {
-  const [status, setStatus] = useState<string>('requested')
+  withdrawals, memberName, cfg, onChange, onErr,
+}: {
+  withdrawals: WithdrawalRequest[]; memberName: (id: string) => string
+  cfg: OrgFinanceConfig; onChange: () => void; onErr: (m: string) => void
+}) {
+  const [filter, setFilter] = useState('needs_approval')
   const [busy, setBusy] = useState(false)
-  const list = withdrawals.filter((w) => status === 'all' || w.status === status)
+  const [payFor, setPayFor] = useState<WithdrawalRequest | null>(null)
+  const caps = cfg.viewer_capabilities
+  const f = WD_FILTERS.find((x) => x.key === filter) ?? WD_FILTERS[0]
+  const list = withdrawals.filter(f.match)
+  const restricted = cfg.finance_status !== 'active'
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true)
@@ -466,41 +511,196 @@ function WithdrawalsQueue({
 
   return (
     <>
-      <div className="view-tabs" style={{ marginBottom: 12 }}>
-        {['requested', 'approved', 'processing', 'paid', 'rejected', 'all'].map((s) => (
-          <button key={s} type="button" className={`view-tab ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>{s}</button>
+      <div className="view-tabs" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+        {WD_FILTERS.map((x) => (
+          <button key={x.key} type="button" className={`view-tab ${filter === x.key ? 'active' : ''}`} onClick={() => setFilter(x.key)}>
+            {x.label} · {withdrawals.filter(x.match).length}
+          </button>
         ))}
       </div>
-      {list.length === 0 ? <p className="empty-row">Nothing here.</p> : list.map((w) => (
-        <div className="fin-wd" key={w.id}>
-          <div>
-            <strong>{memberName(w.member_id)}</strong> · {money(w.amount, w.currency)} · <span className="md-muted">{w.reference}</span>
-            <div className="md-muted" style={{ fontSize: 12 }}>
-              Requested {new Date(w.created_at).toLocaleString()} · Available before: {w.available_before != null ? money(w.available_before, w.currency) : '—'}
-              {w.method ? ` · ${w.method}` : ''}
-              {w.payout_snapshot ? ` · ${w.payout_snapshot.bank_name} ${w.payout_snapshot.account_number}` : ''}
+
+      {list.length === 0 ? <p className="empty-row">Nothing here.</p> : list.map((w) => {
+        const dest = w.payout_snapshot
+        const tail = dest?.masked_account_number
+          ?? (dest?.account_number ? '••••' + dest.account_number.slice(-4) : null)
+        return (
+          <div className="fin-wd" key={w.id} style={{ flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <strong>{memberName(w.member_id)}</strong> · {money(w.amount, w.currency)} · <span className="md-muted">{w.reference}</span>
+              <div className="md-muted" style={{ fontSize: 12 }}>
+                Requested {new Date(w.created_at).toLocaleString()} · Available before {w.available_before != null ? money(w.available_before, w.currency) : '—'}
+                {dest ? ` · ${dest.bank_name ?? 'Bank'} ${tail ?? ''} · ${dest.account_name ?? ''}` : ''}
+              </div>
+              <div className="md-muted" style={{ fontSize: 12 }}>
+                Approvals {w.approvals_count}/{w.approvals_required}
+                {w.authorized_at ? ` · authorized ${new Date(w.authorized_at).toLocaleDateString()}` : ''}
+                {w.payment_recorded_at ? ` · payment recorded ${new Date(w.payment_recorded_at).toLocaleDateString()}` : ''}
+                {w.failure_reason ? ` · ${w.failure_reason}` : ''}
+              </div>
+              {w.member_note && <div className="md-muted" style={{ fontSize: 12 }}>“{w.member_note}”</div>}
             </div>
-            {w.member_note && <div className="md-muted" style={{ fontSize: 12 }}>“{w.member_note}”</div>}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <WithdrawalStatusPill status={w.status} />
+
+              {(w.status === 'requested' || w.status === 'under_review') && caps.approve && <>
+                <button type="button" disabled={busy} onClick={() => act(() => reviewWithdrawal(w.id, 'approve'))}>
+                  {w.approvals_count + 1 >= w.approvals_required ? 'Approve' : `Approve (${w.approvals_count + 1}/${w.approvals_required})`}
+                </button>
+                <button type="button" className="btn-ghost" disabled={busy} onClick={() => {
+                  const r = prompt('Reason for rejecting?') ?? ''
+                  if (r) act(() => reviewWithdrawal(w.id, 'reject', r))
+                }}>Reject</button>
+              </>}
+
+              {w.status === 'approved' && caps.authorize && (
+                <button type="button" disabled={busy || restricted} onClick={() => act(() => authorizeWithdrawal(w.id))}>
+                  Authorize for payment
+                </button>
+              )}
+
+              {w.status === 'authorized_for_payment' && caps.record_payment && (
+                <button type="button" disabled={busy || restricted} onClick={() => setPayFor(w)}>Record payment</button>
+              )}
+
+              {w.status === 'payment_recorded' && caps.confirm_payment && (
+                <button type="button" disabled={busy} onClick={() => act(() => confirmWithdrawalPayment(w.id))}>Confirm payment</button>
+              )}
+
+              {(w.status === 'authorized_for_payment' || w.status === 'payment_recorded' || w.status === 'failed') && caps.record_payment && <>
+                {w.status === 'failed' && <button type="button" disabled={busy || restricted} onClick={() => setPayFor(w)}>Retry payment</button>}
+                <button type="button" className="btn-ghost" disabled={busy} onClick={() => {
+                  const r = prompt('Mark this payment as failed — reason?') ?? ''
+                  if (!r) return
+                  const back = confirm('Return the reserved funds to the member now? Cancel = keep held for a retry.')
+                  act(() => failWithdrawal(w.id, r, back))
+                }}>Mark failed</button>
+              </>}
+
+              {w.status === 'paid' && caps.reconcile && (
+                <button type="button" className="btn-ghost" disabled={busy} onClick={() => {
+                  const r = prompt('Reverse this paid withdrawal — reason? (funds return to the member)') ?? ''
+                  if (r) act(() => reverseWithdrawal(w.id, r))
+                }}>Reverse</button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <WithdrawalStatusPill status={w.status} />
-            {w.status === 'requested' && <>
-              <button type="button" disabled={busy} onClick={() => act(() => reviewWithdrawal(w.id, 'approve'))}>Approve</button>
-              <button type="button" className="btn-ghost" disabled={busy} onClick={() => {
-                const r = prompt('Reason for rejecting?') ?? ''
-                if (r) act(() => reviewWithdrawal(w.id, 'reject', r))
-              }}>Reject</button>
-            </>}
-            {w.status === 'approved' && <button type="button" disabled={busy} onClick={() => act(() => setWithdrawalProcessing(w.id))}>Mark processing</button>}
-            {(w.status === 'approved' || w.status === 'processing') && (
-              <button type="button" disabled={busy} onClick={() => {
-                const ref = prompt('Payment reference?') ?? ''
-                act(() => markWithdrawalPaid({ withdrawalId: w.id, paidOn: localDateString(), amountPaid: w.amount, reference: ref || undefined, method: w.method || undefined }))
-              }}>Mark paid</button>
-            )}
+        )
+      })}
+
+      {payFor && (
+        <RecordPaymentModal
+          withdrawal={payFor}
+          onClose={() => setPayFor(null)}
+          onDone={() => { setPayFor(null); onChange() }}
+          onErr={onErr}
+        />
+      )}
+    </>
+  )
+}
+
+function RecordPaymentModal({
+  withdrawal, onClose, onDone, onErr,
+}: { withdrawal: WithdrawalRequest; onClose: () => void; onDone: () => void; onErr: (m: string) => void }) {
+  const w = withdrawal
+  const [channel, setChannel] = useState<FinancePaymentChannel>('office_bank_transfer')
+  const [method, setMethod] = useState('')
+  const [reference, setReference] = useState('')
+  const [bankOrProvider, setBankOrProvider] = useState(w.payout_snapshot?.bank_name ?? '')
+  const [paymentDate, setPaymentDate] = useState(localDateString())
+  const [proofUrl, setProofUrl] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!reference.trim()) { onErr('A transaction reference is required.'); return }
+    setBusy(true)
+    try {
+      await recordWithdrawalPayment({
+        withdrawalId: w.id, channel, method: method.trim() || undefined, reference: reference.trim(),
+        paymentDate: new Date(paymentDate).toISOString(), bankOrProvider: bankOrProvider.trim() || undefined,
+        proofUrl: proofUrl.trim() || undefined, note: note.trim() || undefined,
+      })
+      onDone()
+    } catch (e2) { onErr(e2 instanceof Error ? e2.message : 'Could not record the payment.'); setBusy(false) }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={submit}>
+          <h2>Record payment</h2>
+          <p className="md-muted" style={{ fontSize: 13 }}>
+            {w.reference} · approved amount <strong>{money(w.amount, w.currency)}</strong>
+            {w.payout_snapshot ? ` · ${w.payout_snapshot.bank_name ?? ''} ${w.payout_snapshot.masked_account_number ?? ''} · ${w.payout_snapshot.account_name ?? ''}` : ''}
+          </p>
+          <div className="field-row">
+            <label>Payment method
+              <select value={channel} onChange={(e) => setChannel(e.target.value as FinancePaymentChannel)}>
+                {(['office_bank_transfer', 'provider_transfer', 'other'] as FinancePaymentChannel[]).map((c) => (
+                  <option key={c} value={c}>{PAYMENT_CHANNEL_LABEL[c]}</option>
+                ))}
+              </select>
+            </label>
+            <label>Payment date<input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} /></label>
           </div>
-        </div>
-      ))}
+          <div className="field-row">
+            <label>Transaction reference<input value={reference} onChange={(e) => setReference(e.target.value)} required placeholder="Bank / provider reference" /></label>
+            <label>Bank / provider (optional)<input value={bankOrProvider} onChange={(e) => setBankOrProvider(e.target.value)} /></label>
+          </div>
+          <div className="field-row">
+            <label>Method detail (optional)<input value={method} onChange={(e) => setMethod(e.target.value)} placeholder="e.g. NIP transfer" /></label>
+            <label>Proof URL (optional)<input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="https://…" /></label>
+          </div>
+          <label>Internal note (optional)<textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></label>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button type="submit" disabled={busy}>{busy ? 'Recording…' : 'Record payment'}</button>
+            <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ReconciliationView({ orgId, onGo }: { orgId: string; onGo: (t: Tab) => void }) {
+  const [r, setR] = useState<FinanceReconciliation | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { loadReconciliation(orgId).then(setR).catch((e) => setErr(e.message)) }, [orgId])
+  if (err) return <p className="form-error">{err}</p>
+  if (!r) return <p className="empty-row">Loading…</p>
+
+  const rows: { label: string; n: number; hint: string; go?: Tab }[] = [
+    { label: 'Authorized > 48h without payment', n: r.stuck_authorized, hint: 'Payment authorized but not yet recorded', go: 'withdrawals' },
+    { label: 'Payments awaiting confirmation', n: r.awaiting_confirmation, hint: 'Recorded but not confirmed as paid', go: 'withdrawals' },
+    { label: 'Failed payouts', n: r.failed, hint: 'A payment attempt failed and is unresolved', go: 'withdrawals' },
+    { label: 'Settled earnings not credited', n: r.settled_not_credited, hint: 'Settlement recorded, member not yet credited', go: 'orders' },
+    { label: 'Duplicate payment references', n: r.duplicate_payment_refs, hint: 'Same transaction reference used more than once' },
+    { label: 'Negative member balances', n: r.negative_balances, hint: 'A member/currency ledger sums below zero — investigate' },
+    { label: 'Paid without a payout record', n: r.paid_without_payout_row, hint: 'Marked paid but no finance_payouts row exists' },
+  ]
+  const clean = rows.every((x) => x.n === 0)
+
+  return (
+    <>
+      <p className="md-muted" style={{ marginBottom: 12 }}>
+        Compares Bizzlivo's records against the withdrawal workflow. Nothing here changes money — it flags divergence for a person to resolve.
+      </p>
+      {clean ? <p className="empty-row">Everything reconciles. No open discrepancies.</p> : (
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Check</th><th style={{ textAlign: 'right' }}>Count</th><th>What it means</th></tr></thead>
+          <tbody>
+            {rows.map((x) => (
+              <tr key={x.label} style={{ cursor: x.go ? 'pointer' : undefined }} onClick={() => x.go && onGo(x.go)}>
+                <td>{x.label}</td>
+                <td style={{ textAlign: 'right', color: x.n > 0 ? 'var(--tint-attn)' : 'var(--tint-ok)', fontWeight: 700 }}>{x.n}</td>
+                <td className="cell-dim">{x.hint}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      )}
     </>
   )
 }

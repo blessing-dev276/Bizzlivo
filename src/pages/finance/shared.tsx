@@ -18,11 +18,15 @@ const ORDER_TINT: Record<FinanceOrderStatus, string> = {
 }
 const WD_TINT: Record<WithdrawalStatus, string> = {
   requested: 'var(--tint-events)',
+  under_review: 'var(--tint-events)',
   approved: 'var(--tint-primary)',
-  processing: 'var(--tint-primary)',
+  authorized_for_payment: 'var(--tint-primary)',
+  payment_recorded: 'var(--tint-primary)',
   paid: 'var(--tint-ok)',
   rejected: 'var(--tint-attn)',
   cancelled: 'var(--text-dim)',
+  failed: 'var(--tint-attn)',
+  reversed: 'var(--tint-attn)',
 }
 
 export function OrderStatusPill({ status }: { status: FinanceOrderStatus }) {

@@ -368,18 +368,54 @@ export const requestWithdrawal = (a: {
   p_method: a.method ?? null, p_account_id: a.accountId ?? null, p_note: a.note ?? null,
 })
 
+// ---- withdrawal state machine (0065) ----
+
 export const reviewWithdrawal = (withdrawalId: string, decision: 'approve' | 'reject', note?: string) =>
   rpc('finance_review_withdrawal', { p_withdrawal: withdrawalId, p_decision: decision, p_note: note ?? null })
 
-export const setWithdrawalProcessing = (withdrawalId: string) =>
-  rpc('finance_set_withdrawal_processing', { p_withdrawal: withdrawalId })
+export const authorizeWithdrawal = (withdrawalId: string, note?: string) =>
+  rpc('finance_authorize_withdrawal', { p_withdrawal: withdrawalId, p_note: note ?? null })
 
-export const markWithdrawalPaid = (a: {
-  withdrawalId: string; paidOn: string; amountPaid: number; reference?: string; method?: string; proofUrl?: string; note?: string
-}) => rpc('finance_mark_withdrawal_paid', {
-  p_withdrawal: a.withdrawalId, p_paid_on: a.paidOn, p_amount_paid: a.amountPaid,
-  p_reference: a.reference ?? null, p_method: a.method ?? null, p_proof_url: a.proofUrl ?? null, p_note: a.note ?? null,
+export const recordWithdrawalPayment = (a: {
+  withdrawalId: string; channel: FinancePaymentChannel; method?: string; reference: string
+  paymentDate?: string; bankOrProvider?: string; proofUrl?: string; note?: string
+}) => rpc('finance_record_withdrawal_payment', {
+  p_withdrawal: a.withdrawalId, p_channel: a.channel, p_method: a.method ?? null,
+  p_reference: a.reference, p_payment_date: a.paymentDate ?? new Date().toISOString(),
+  p_bank_or_provider: a.bankOrProvider ?? null, p_proof_url: a.proofUrl ?? null, p_note: a.note ?? null,
 })
+
+export const confirmWithdrawalPayment = (withdrawalId: string, note?: string) =>
+  rpc('finance_confirm_withdrawal_payment', { p_withdrawal: withdrawalId, p_note: note ?? null })
+
+export const failWithdrawal = (withdrawalId: string, reason: string, returnFunds = false) =>
+  rpc('finance_fail_withdrawal', { p_withdrawal: withdrawalId, p_reason: reason, p_return_funds: returnFunds })
+
+export const reverseWithdrawal = (withdrawalId: string, reason: string) =>
+  rpc('finance_reverse_withdrawal', { p_withdrawal: withdrawalId, p_reason: reason })
 
 export const cancelWithdrawal = (withdrawalId: string, reason?: string) =>
   rpc('finance_cancel_withdrawal', { p_withdrawal: withdrawalId, p_reason: reason ?? null })
+
+// ---- manual ledger adjustment (§13) ----
+
+export const manualAdjustment = (a: {
+  orgId: string; memberId: string; direction: 'credit' | 'debit'; amount: number; currency: string; reason: string
+}) => rpc('finance_manual_adjustment', {
+  p_org: a.orgId, p_member: a.memberId, p_direction: a.direction,
+  p_amount: a.amount, p_currency: a.currency, p_reason: a.reason,
+})
+
+// ---- office finance settings / permissions ----
+
+export const updateFinanceConfig = (orgId: string, patch: Partial<Record<string, unknown>>) =>
+  rpc('finance_update_config', { p_org: orgId, p_patch: patch })
+
+export const updateFinanceConnection = (orgId: string, patch: Partial<Record<string, unknown>>) =>
+  rpc('finance_update_connection', { p_org: orgId, p_patch: patch })
+
+export const setFinanceGrant = (orgId: string, userId: string, patch: Partial<Record<string, unknown>>) =>
+  rpc('finance_set_grant', { p_org: orgId, p_user: userId, p_patch: patch })
+
+export const revokeFinanceGrant = (orgId: string, userId: string) =>
+  rpc('finance_revoke_grant', { p_org: orgId, p_user: userId })

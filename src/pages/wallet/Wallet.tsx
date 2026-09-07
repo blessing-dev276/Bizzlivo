@@ -26,9 +26,11 @@ import {
   moneyList,
   requestWithdrawal,
   cancelWithdrawal,
+  withdrawalMemberStatus,
+  WITHDRAWAL_MEMBER_LABEL,
   type NigerianBank,
 } from '../../lib/finance'
-import { OrderBreakdown, OrderStatusPill, WithdrawalStatusPill } from '../finance/shared'
+import { OrderBreakdown, OrderStatusPill } from '../finance/shared'
 
 type TxFilter = 'all' | 'order_recorded' | 'settlement' | 'available_credit' | 'charge' | 'withdrawal' | 'payout'
 
@@ -59,6 +61,7 @@ export default function Wallet() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [tab, setTab] = useState<'overview' | 'transactions' | 'withdrawals' | 'payout'>('overview')
   const [filter, setFilter] = useState<TxFilter>('all')
   const [detail, setDetail] = useState<{ order: FinanceOrder; charges: FinanceCharge[] } | null>(null)
   const [showWithdraw, setShowWithdraw] = useState(false)
@@ -103,32 +106,46 @@ export default function Wallet() {
 
   if (loading) return <div className="page"><h1>My Wallet</h1><p className="empty-row">Loading…</p></div>
 
+  const pendingPlatform = moneyList(balances?.pending_platform)
+
   return (
     <div className="page fin">
       <div className="lc-head">
         <h1>My Wallet</h1>
-        <p>Every amount here is a verified office earning — you can trace exactly where it came from, what was deducted, and what became available.</p>
+        <p>Every amount here is a verified office earning — you can trace exactly where it came from, what was deducted, and what became available. Bizzlivo keeps the record; your office pays approved withdrawals from its own account.</p>
       </div>
       {error && <p className="form-error">{error}</p>}
 
       <div className="fin-balances">
-        <Balance label="Available to Withdraw" value={moneyList(availableList)} tone="ok" />
-        <Balance label="Pending Platform Funds" value={moneyList(balances?.pending_platform)} tone="events" />
+        <Balance label="Available Balance" value={moneyList(availableList)} tone="ok" />
         <Balance label="Pending Withdrawal" value={moneyList(balances?.pending_withdrawal)} tone="primary" />
-        <Balance label="Total Paid Out" value={moneyList(balances?.total_paid_out)} />
-        <Balance label="Lifetime Earnings" value={moneyList(balances?.lifetime_gross)} />
+        <Balance label="Total Earned" value={moneyList(balances?.total_credited)} />
+        <Balance label="Total Withdrawn" value={moneyList(balances?.total_paid_out)} />
       </div>
-
-      {canWithdraw && (
-        <button type="button" className="md-btn" style={{ marginTop: 4 }} onClick={() => setShowWithdraw(true)}>
-          Request Withdrawal
-        </button>
+      {pendingPlatform !== '—' && (
+        <p className="md-muted" style={{ fontSize: 12, marginTop: 6 }}>
+          Pending platform funds (not yet settled / verified): {pendingPlatform}
+        </p>
       )}
 
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {canWithdraw && (
+          <button type="button" className="md-btn" onClick={() => setShowWithdraw(true)}>Withdraw</button>
+        )}
+        <button type="button" className="md-btn ghost" onClick={() => setTab('payout')}>Payout Account</button>
+      </div>
+
+      <div className="view-tabs" style={{ margin: '18px 0' }}>
+        {([['overview', 'Overview'], ['transactions', 'Transactions'], ['withdrawals', 'Withdrawals'], ['payout', 'Payout Account']] as const).map(([k, l]) => (
+          <button key={k} type="button" className={`view-tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
       <section className="fin-section">
         <h4 className="overview-heading">RECENT EARNINGS</h4>
         {orders.length === 0 ? (
-          <p className="empty-row">No verified earnings yet. Your office earnings appear here once an admin records an order.</p>
+          <p className="empty-row">No verified earnings yet. Your office earnings appear here once an admin records and verifies an order.</p>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
@@ -150,7 +167,9 @@ export default function Wallet() {
           </div>
         )}
       </section>
+      )}
 
+      {tab === 'withdrawals' && (
       <section className="fin-section">
         <h4 className="overview-heading">WITHDRAWALS</h4>
         {withdrawals.length === 0 ? (
@@ -160,14 +179,23 @@ export default function Wallet() {
             <table className="data-table">
               <thead><tr><th>Request #</th><th>Amount</th><th>Status</th><th>Requested</th><th /></tr></thead>
               <tbody>
-                {withdrawals.map((w) => (
+                {withdrawals.map((w) => {
+                  const ms = withdrawalMemberStatus(w.status)
+                  return (
                   <tr key={w.id}>
                     <td>{w.reference}</td>
                     <td>{money(w.amount, w.currency)}</td>
-                    <td><WithdrawalStatusPill status={w.status} /></td>
+                    <td>
+                      {(() => {
+                        const c = ms === 'paid' ? 'var(--tint-ok)'
+                          : ms === 'returned' || ms === 'not_approved' ? 'var(--tint-attn)'
+                          : 'var(--tint-primary)'
+                        return <span className="status-pill" style={{ color: c, border: `1px solid ${c}` }}>{WITHDRAWAL_MEMBER_LABEL[ms]}</span>
+                      })()}
+                    </td>
                     <td className="cell-dim">{new Date(w.created_at).toLocaleDateString()}</td>
                     <td style={{ textAlign: 'right' }}>
-                      {w.status === 'requested' && (
+                      {(w.status === 'requested' || w.status === 'under_review') && (
                         <button type="button" className="btn-ghost" onClick={async () => {
                           if (!confirm('Cancel this withdrawal request? The funds return to your available balance.')) return
                           try { await cancelWithdrawal(w.id); await reload() }
@@ -176,13 +204,16 @@ export default function Wallet() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </section>
+      )}
 
+      {tab === 'transactions' && (
       <section className="fin-section">
         <h4 className="overview-heading">TRANSACTION HISTORY</h4>
         <div className="view-tabs" style={{ marginBottom: 12 }}>
@@ -217,12 +248,19 @@ export default function Wallet() {
           </div>
         )}
       </section>
+      )}
 
+      {tab === 'payout' && (
       <section className="fin-section">
-        <h4 className="overview-heading">PAYOUT ACCOUNTS</h4>
+        <h4 className="overview-heading">PAYOUT ACCOUNT</h4>
+        <p className="md-muted" style={{ fontSize: 12, marginBottom: 10 }}>
+          Where approved withdrawals are paid. The account name is confirmed from the number — it can't be typed by hand.
+        </p>
         <PayoutAccounts orgId={orgId!} userId={userId!} accounts={accounts} onChange={reload} />
       </section>
+      )}
 
+      {tab === 'overview' && (
       <section className="fin-section">
         <button type="button" className="btn-ghost" onClick={() => setShowPersonal((v) => !v)}>
           {showPersonal ? '▾' : '▸'} Personal income log
@@ -231,6 +269,7 @@ export default function Wallet() {
           <PersonalIncome orgId={orgId!} userId={userId!} entries={personal} onChange={reload} canEdit={currentMembership?.role === 'admin'} />
         )}
       </section>
+      )}
 
       {detail && (
         <div className="drawer-overlay open" onClick={() => setDetail(null)}>
@@ -404,9 +443,13 @@ function PayoutAccounts({
     e.preventDefault()
     if (!canSave) return
     setBusy(true)
+    const num = accountNumber.trim()
     await supabase.from('member_payout_accounts').insert({
       org_id: orgId, user_id: userId, bank_name: bankName.trim(), account_name: accountName.trim(),
-      account_number: accountNumber.trim(), is_default: accounts.length === 0,
+      account_number: num, bank_code: bankCode || null,
+      masked_account_number: '••••' + num.slice(-4),
+      provider: 'paystack', status: 'verified', verified_at: new Date().toISOString(),
+      is_default: accounts.length === 0,
     })
     setBusy(false); setAdding(false); resetForm()
     onChange()

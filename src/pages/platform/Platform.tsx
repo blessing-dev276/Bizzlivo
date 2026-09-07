@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/AuthContext'
 import ThemeToggle from '../../components/ThemeToggle'
 import {
   clearPlanOverride,
+  deleteOrgPermanently,
   extendTrial,
   getAiUsage,
   getAudit,
@@ -190,7 +191,7 @@ function PlatformShell() {
           <Routes>
             <Route index element={<Overview />} />
             <Route path="organizations" element={<Orgs />} />
-            <Route path="organizations/:orgId" element={<OrgDetail />} />
+            <Route path="organizations/:orgId" element={<OrgDetail isSuper={role === 'super_admin'} />} />
             <Route path="subscriptions" element={<Subscriptions />} />
             <Route path="users" element={<Users />} />
             <Route path="ai" element={<AiUsage />} />
@@ -444,8 +445,9 @@ function Orgs() {
 // ============================================================
 // Organization detail
 // ============================================================
-function OrgDetail() {
+function OrgDetail({ isSuper }: { isSuper: boolean }) {
   const { orgId } = useParams<{ orgId: string }>()
+  const nav = useNavigate()
   const [tab, setTab] = useState('overview')
   const { data, err, loading, reload } = useAsync<Record<string, unknown>>(() => getOrgDetail(orgId!), [orgId])
   const [busy, setBusy] = useState(false)
@@ -511,6 +513,24 @@ function OrgDetail() {
               {sub && <ReasonAction label="Extend trial 14 days" busy={busy} onSubmit={(r) => act(() => extendTrial(orgId!, 14, r), 'Trial extended.')} />}
             </div>
           </Panel>
+
+          {isSuper && (
+            <Panel title="Danger zone">
+              <PurgeOrgAction
+                slug={String(org.slug)}
+                name={String(org.name)}
+                members={Number(usage.members ?? 0)}
+                busy={busy}
+                onConfirm={async (reason) => {
+                  setBusy(true); setMsg(null)
+                  const { error } = await deleteOrgPermanently(orgId!, String(org.slug), reason)
+                  setBusy(false)
+                  if (error) { setMsg(error.message); return }
+                  nav('/platform/organizations', { replace: true })
+                }}
+              />
+            </Panel>
+          )}
         </>
       )}
 
@@ -576,6 +596,49 @@ function ReasonAction({ label, danger, busy, onSubmit }: { label: string; danger
       <button className={`gl-btn sm ${danger ? 'danger' : ''}`} disabled={busy || !reason.trim()} onClick={() => onSubmit(reason.trim())}>Confirm</button>
       <button className="gl-btn ghost sm" onClick={() => setOpen(false)}>Cancel</button>
     </span>
+  )
+}
+
+function PurgeOrgAction({
+  slug, name, members, busy, onConfirm,
+}: { slug: string; name: string; members: number; busy: boolean; onConfirm: (reason: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [reason, setReason] = useState('')
+
+  if (!open) {
+    return (
+      <button className="gl-btn ghost sm danger" onClick={() => setOpen(true)}>
+        Permanently delete this organization
+      </button>
+    )
+  }
+
+  const ready = typed.trim() === slug && reason.trim().length > 0 && !busy
+
+  return (
+    <div className="pl-purge">
+      <p className="pl-purge-warn">
+        This <strong>permanently</strong> deletes <strong>{name}</strong> and everything in it —
+        {members} member{members === 1 ? '' : 's'}, all training, finance records, the wallet ledger,
+        goals and audit history. <strong>It cannot be undone</strong> and no notice is sent to the
+        office. Members keep their Bizzlivo accounts. A record is kept in the platform deletion log.
+      </p>
+      <label className="pl-purge-field">
+        Type the office slug <code>{slug}</code> to confirm
+        <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} placeholder={slug} />
+      </label>
+      <label className="pl-purge-field">
+        Reason (required, kept in the deletion log)
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Duplicate office, requested by owner" />
+      </label>
+      <div className="pl-purge-actions">
+        <button className="gl-btn sm danger" disabled={!ready} onClick={() => onConfirm(reason.trim())}>
+          {busy ? 'Deleting…' : 'Delete permanently'}
+        </button>
+        <button className="gl-btn ghost sm" onClick={() => { setOpen(false); setTyped(''); setReason('') }}>Cancel</button>
+      </div>
+    </div>
   )
 }
 function PlanOverrideAction({ orgId, current, hasOverride, busy, onDone, setMsg }: {
