@@ -9,6 +9,7 @@ import type {
   FinanceOrder,
   FinancePayout,
   FinancePaymentChannel,
+  FinanceReconciliation,
   OrgFinanceConfig,
   Profile,
   WithdrawalRequest,
@@ -44,7 +45,6 @@ import {
   reviewWithdrawal,
   voidCharge,
 } from '../../lib/finance'
-import type { FinanceReconciliation } from '../../lib/finance'
 import { OrderBreakdown, OrderStatusPill, WithdrawalStatusPill } from './shared'
 
 type Tab = 'overview' | 'orders' | 'withdrawals' | 'members' | 'transactions' | 'reconciliation'
@@ -113,7 +113,7 @@ export default function FinanceWorkspace() {
             <p className="form-error">Finance is restricted{cfg.finance_status_reason ? ` — ${cfg.finance_status_reason}` : ''}. Payouts cannot be initiated.</p>
           )}
         </div>
-        {caps?.verify_settlement && <button type="button" className="md-btn" onClick={() => setShowRecord(true)}>Record earning</button>}
+        {caps?.is_admin && <button type="button" className="md-btn" onClick={() => setShowRecord(true)}>Record earning</button>}
       </div>
       {error && <p className="form-error">{error}</p>}
 

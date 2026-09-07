@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { localDateString } from '../../lib/date'
+import { loadUpcoming } from '../../lib/eventsData'
 
 export interface ActivityDay {
   key: string // YYYY-MM-DD (local)
@@ -109,9 +110,7 @@ export function useOfficeSnapshot(orgId: string | undefined) {
         classItemsCompletedR,
         teamLeadersR,
         teamsCountR,
-        eventsTodayR,
-        upcomingOrientationR,
-        upcomingEventsR,
+        eventsBundle,
         attemptsThisWeekR,
         attemptsLastWeekR,
         attempts14R,
@@ -137,9 +136,9 @@ export function useOfficeSnapshot(orgId: string | undefined) {
         supabase.from('class_item_progress').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('status', 'completed'),
         supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('status', 'active').eq('role', 'team_leader'),
         supabase.from('groups').select('id', { count: 'exact', head: true }).eq('org_id', org),
-        supabase.from('events').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('status', 'scheduled').gte('start_at', todayStart).lt('start_at', todayEnd),
-        supabase.from('events').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('category', 'orientation').eq('status', 'scheduled').gte('start_at', nowIso),
-        supabase.from('events').select('id, title, start_at, end_at, venue_type, venue_location, category').eq('org_id', org).eq('status', 'scheduled').gte('start_at', nowIso).order('start_at', { ascending: true }).limit(5),
+        // One occurrence-aware pull covers today's count, upcoming list and
+        // the "has an orientation coming" flag — recurring series included.
+        loadUpcoming(org, 45),
         supabase.from('attempts').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('status', 'submitted').eq('is_guest', false).gte('submitted_at', weekAgo),
         supabase.from('attempts').select('id', { count: 'exact', head: true }).eq('org_id', org).eq('status', 'submitted').eq('is_guest', false).gte('submitted_at', twoWeeksAgo).lt('submitted_at', weekAgo),
         supabase.from('attempts').select('submitted_at, user_id').eq('org_id', org).eq('status', 'submitted').eq('is_guest', false).gte('submitted_at', twoWeeksAgo),
@@ -196,6 +195,23 @@ export function useOfficeSnapshot(orgId: string | undefined) {
         if (r.user_id) activeIds.add(r.user_id)
       }
 
+      // Derive the event numbers from the occurrence-resolved bundle.
+      const nowMs = Date.now()
+      const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+      const endOfToday = new Date(startOfToday.getTime() + 86400000)
+      const liveOrFuture = eventsBundle.occurrences.filter((o) => o.status !== 'cancelled' && o.endAt.getTime() >= nowMs)
+      const eventsToday = liveOrFuture.filter((o) => o.startAt >= startOfToday && o.startAt < endOfToday).length
+      const upcomingEvents: UpcomingEventLite[] = liveOrFuture.slice(0, 5).map((o) => ({
+        id: o.eventId,
+        title: o.title,
+        start_at: o.startAt.toISOString(),
+        end_at: o.endAt.toISOString(),
+        venue_type: o.venueType,
+        venue_location: o.venueLocation,
+        category: o.category,
+      }))
+      const hasUpcomingOrientation = liveOrFuture.some((o) => o.category === 'orientation')
+
       const snapshot: OfficeSnapshot = {
         totalMembers: count(totalMembersR),
         activeThisWeek: activeIds.size,
@@ -209,7 +225,7 @@ export function useOfficeSnapshot(orgId: string | undefined) {
         pendingMembers: count(pendingMembersR),
         courseworkPending: count(courseworkPendingR),
         questionsPending: count(questionsPendingR),
-        eventsToday: count(eventsTodayR),
+        eventsToday: eventsToday,
         resourceCount: count(resourceCountR),
         publishedClasses: count(publishedClassesR),
         classItemsTotal: count(classItemsTotalR),
@@ -218,10 +234,10 @@ export function useOfficeSnapshot(orgId: string | undefined) {
         teamLeaders: count(teamLeadersR),
         teamsCount: count(teamsCountR),
         activity: days,
-        upcomingEvents: (upcomingEventsR.data as UpcomingEventLite[]) ?? [],
+        upcomingEvents,
         attemptsThisWeek: count(attemptsThisWeekR),
         attemptsLastWeek: count(attemptsLastWeekR),
-        hasUpcomingOrientation: count(upcomingOrientationR) > 0,
+        hasUpcomingOrientation,
       }
 
       setData(snapshot)

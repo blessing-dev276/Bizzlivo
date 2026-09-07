@@ -238,6 +238,7 @@ const NAV_SECTIONS: NavSection[] = [
           { to: '/settings/notifications', icon: I.megaphone, label: 'Notifications' },
           { to: '/settings/security', icon: I.settings, label: 'Account & Security' },
           { to: '/settings/office', icon: I.myTeam, label: 'Office', show: (c) => c.isAdmin },
+          { to: '/settings/finance', icon: I.finance, label: 'Finance', show: (c) => c.isAdmin },
           { to: '/settings/billing', icon: I.wallet, label: 'Billing & Plan', show: (c) => c.isAdmin },
         ],
       },

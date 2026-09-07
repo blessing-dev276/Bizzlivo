@@ -292,6 +292,29 @@ select o.id, 'paystack', 'external_manual', 'active',
 from organizations o
 on conflict do nothing;
 
+-- Every future office gets the same rows the instant it is created.
+create or replace function seed_org_finance()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into organization_finance_config (org_id, base_currency)
+  values (new.id, coalesce(new.base_currency, 'NGN'))
+  on conflict (org_id) do nothing;
+
+  insert into organization_finance_connections (org_id, provider, connection_type, status, currency, capabilities)
+  values (new.id, 'paystack', 'external_manual', 'active', coalesce(new.base_currency, 'NGN'),
+    jsonb_build_object('supports_bank_resolution', true, 'supports_transfer_recipients', false,
+      'supports_transfers', false, 'supports_subaccounts', false, 'supports_splits', false,
+      'supports_virtual_accounts', false, 'supports_balance_lookup', false,
+      'supports_connected_merchants', false, 'supports_webhooks', false))
+  on conflict do nothing;
+  return new;
+end;
+$$;
+drop trigger if exists organizations_seed_finance on organizations;
+create trigger organizations_seed_finance
+  after insert on organizations
+  for each row execute function seed_org_finance();
+
 -- ============================================================
 -- 10. RLS  — reads only from the client; all writes via the RPCs below
 -- ============================================================
@@ -1049,6 +1072,11 @@ begin
       select coalesce(jsonb_agg(jsonb_build_object('currency', currency, 'amount', amt) order by currency), '[]'::jsonb)
       from (select currency, sum(amount) amt from finance_ledger
             where org_id = p_org and affects_balance = true group by currency having sum(amount) <> 0) s),
+    -- legacy alias kept for the Reports finance tab (0041/reportTabs)
+    'available_member_funds', (
+      select coalesce(jsonb_agg(jsonb_build_object('currency', currency, 'amount', amt) order by currency), '[]'::jsonb)
+      from (select currency, sum(amount) amt from finance_ledger
+            where org_id = p_org and affects_balance = true group by currency having sum(amount) <> 0) s),
     'pending_withdrawals_count', (select count(*) from withdrawal_requests
        where org_id = p_org and status in ('requested','under_review')),
     'processing_payouts_count', (select count(*) from withdrawal_requests
@@ -1065,7 +1093,11 @@ begin
       'withdrawals_awaiting_authorization', (select count(*) from withdrawal_requests where org_id = p_org and status = 'approved'),
       'withdrawals_awaiting_payment', (select count(*) from withdrawal_requests where org_id = p_org and status = 'authorized_for_payment'),
       'withdrawals_awaiting_confirmation', (select count(*) from withdrawal_requests where org_id = p_org and status = 'payment_recorded'),
-      'withdrawals_failed', (select count(*) from withdrawal_requests where org_id = p_org and status = 'failed'))
+      'withdrawals_failed', (select count(*) from withdrawal_requests where org_id = p_org and status = 'failed'),
+      -- legacy key kept for the Reports finance tab
+      'missing_conversion', (select count(*) from finance_orders where org_id = p_org and status = 'settled'
+        and credited_at is null and converted = false and settlement_currency is distinct from
+        (select base_currency from organizations where id = p_org)))
   );
 end;
 $$;
@@ -1078,7 +1110,7 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare
   v_status text := new.status;
   v_subject text; v_headline text; v_member_text text; v_link text := '/wallet';
-  v_tail text; v_acct text; u uuid;
+  v_tail text; v_acct text; u uuid; v_send_email boolean := true;
 begin
   if tg_op = 'UPDATE' and new.status is not distinct from old.status then return new; end if;
 
@@ -1109,7 +1141,7 @@ begin
       v_subject := 'Withdrawal request received'; v_headline := 'We received your withdrawal request';
       v_member_text := 'Your withdrawal request for ' || new.amount || ' ' || new.currency || ' has been received.';
     when 'approved' then
-      v_subject := 'Withdrawal approved'; v_headline := 'Your withdrawal has been approved';
+      v_send_email := false;  -- in-app only; the "processing" email follows shortly
       v_member_text := 'Your withdrawal is approved and is being prepared for payment.';
     when 'authorized_for_payment' then
       v_subject := 'Withdrawal is processing'; v_headline := 'Your withdrawal is being processed';
@@ -1132,14 +1164,16 @@ begin
   perform notify(new.org_id, new.member_id, 'finance', 'withdrawal_' || v_status,
     v_member_text, v_link, 'wd:' || new.id::text || ':' || v_status);
 
-  perform enqueue_email(
-    new.org_id, new.member_id, 'withdrawal_update', 'finance',
-    jsonb_build_object('subject', v_subject, 'headline', v_headline,
-      'amount', new.amount, 'currency', new.currency, 'reference', new.reference,
-      'status', v_status, 'account_tail', v_tail,
-      'note', coalesce(new.decided_reason, new.admin_note),
-      'cta_label', 'View wallet', 'cta_path', '/wallet'),
-    'wd:' || new.id::text || ':' || v_status, 'withdrawal_request', new.id);
+  if v_send_email then
+    perform enqueue_email(
+      new.org_id, new.member_id, 'withdrawal_update', 'finance',
+      jsonb_build_object('subject', v_subject, 'headline', v_headline,
+        'amount', new.amount, 'currency', new.currency, 'reference', new.reference,
+        'status', v_status, 'account_tail', v_tail,
+        'note', coalesce(new.decided_reason, new.admin_note),
+        'cta_label', 'View wallet', 'cta_path', '/wallet'),
+      'wd:' || new.id::text || ':' || v_status, 'withdrawal_request', new.id);
+  end if;
   return new;
 end;
 $$;

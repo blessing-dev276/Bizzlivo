@@ -1,5 +1,5 @@
 -- ============================================================
--- 0067 — Events Phase B: occurrence materialization + date-keyed check-in
+-- 0071 — Events Phase B: occurrence materialization + date-keyed check-in
 -- ============================================================
 -- The RRULE engine lives in the frontend (src/lib/recurrence.ts), so the
 -- resolved start/end instants for a given date are passed in — Postgres
