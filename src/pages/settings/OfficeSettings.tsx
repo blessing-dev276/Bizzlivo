@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { useOrgUsage } from '../../lib/plans'
+import { officeLoginUrl } from '../../lib/tenant'
 
 function initials(name: string | undefined | null) {
   if (!name) return '?'
@@ -11,7 +12,6 @@ function initials(name: string | undefined | null) {
 }
 
 const HEX_RE = /^#([0-9a-f]{6})$/i
-const ROOT_DOMAIN = 'bizzlivo.com'
 const CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'GHS', 'KES', 'ZAR', 'CAD']
 
 interface OrgSettingsRow {
@@ -132,8 +132,8 @@ export default function OfficeSettings() {
   }
 
   const showLogo = canBrand && logoUrl.trim() && !imgFailed
-  const officeUrl = slug ? `https://${slug}.${ROOT_DOMAIN}` : ''
-  const loginUrl = slug ? `${officeUrl}/o/${slug}/login` : ''
+  const officeUrl = officeLoginUrl(slug)
+  const loginUrl = officeUrl
 
   async function copyOfficeUrl() {
     if (!officeUrl) return
@@ -241,11 +241,11 @@ export default function OfficeSettings() {
         {/* ---------------- Address (read-only) ---------------- */}
         <section className="set-card">
           <div className="set-card-head">
-            <h2>Office address</h2>
-            <p>Your office lives on its own subdomain. Members sign in here.</p>
+            <h2>Office sign-in link</h2>
+            <p>Share this with members — it opens your office's branded login page.</p>
           </div>
           <div className="set-address">
-            <code className="set-url">{officeUrl || `${slug || 'your-office'}.${ROOT_DOMAIN}`}</code>
+            <code className="set-url">{officeUrl || `.../o/${slug || 'your-office'}/login`}</code>
             <button type="button" className="btn-ghost" onClick={copyOfficeUrl} disabled={!officeUrl}>
               {copied ? 'Copied' : 'Copy link'}
             </button>
@@ -255,7 +255,7 @@ export default function OfficeSettings() {
           </div>
           {loginUrl && (
             <p className="set-hint">
-              Direct sign-in link: <a href={loginUrl}>{loginUrl}</a>
+              Opens <a href={loginUrl}>{loginUrl}</a>
             </p>
           )}
         </section>

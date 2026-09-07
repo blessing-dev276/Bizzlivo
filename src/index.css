@@ -589,6 +589,10 @@ label {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
+  /* decorative pseudo-elements (e.g. .cmd-deck::before nebula) bleed a few
+     dozen px past the content box — clip so they never create sideways
+     page scroll, especially on phones. `clip` = no scroll container. */
+  overflow-x: clip;
 }
 
 /* ---- header cluster (search / refresh / notifications / theme / profile) ---- */
@@ -2442,12 +2446,16 @@ td {
 .dash-pill {
   display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim);
   background: var(--line-soft); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  max-width: 100%; min-width: 0;
 }
 .dash-pill svg { width: 13px; height: 13px; stroke: var(--text-faint); fill: none; stroke-width: 1.8; flex-shrink: 0; }
-.dash-pill.ai { color: var(--text); max-width: 560px; }
+.dash-pill.ai { color: var(--text); max-width: 560px; align-items: flex-start; }
 .dash-pill.ai svg { stroke: var(--tint-primary); }
-.dash-pill code { font-family: var(--font-mono); color: var(--text); font-size: 11.5px; }
-.dash-pill button { background: none; border: none; color: var(--tint-primary); font-size: 11px; font-weight: 600; padding: 0; cursor: pointer; }
+.dash-pill code {
+  font-family: var(--font-mono); color: var(--text); font-size: 11.5px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dash-pill button { background: none; border: none; color: var(--tint-primary); font-size: 11px; font-weight: 600; padding: 0; cursor: pointer; flex-shrink: 0; }
 
 /* office pulse */
 .dash-pulse { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -2622,12 +2630,35 @@ td {
   .oo-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 680px) {
-  .dash-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; gap: 14px; }
   .dash-grid > .col-4, .dash-grid > .col-5, .dash-grid > .col-6,
   .dash-grid > .col-7, .dash-grid > .col-8 { grid-column: 1 / -1; }
-  .dash-pulse { grid-template-columns: 1fr; }
+  .dash { gap: 14px; }
+  .dash-pulse { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .qa-grid { grid-template-columns: 1fr; }
   .cmdbar { display: none; }
+
+  /* command-deck dashboard — calm the decoration + tighten spacing so it
+     reads well on a phone */
+  .cmd-deck::before { inset: 0 0 40px; filter: blur(8px); }
+  .cmd-deck::after { background-size: 36px 36px; opacity: 0.4; }
+  .cmd-deck .dash-card { padding: 15px 15px; }
+  /* backdrop-filter on ~10 stacked cards is a real scroll cost on mobile */
+  .cmd-deck .dash-card, .cmd-deck .pulse-card {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: var(--panel);
+  }
+  .cmd-deck .dash-header { padding: 18px 16px; border-radius: 16px; }
+  .dash-hello { font-size: 20px; }
+  .dash-sub { font-size: 13px; }
+  .dash-metaline { margin-top: 12px; gap: 8px; }
+  .dash-pill { width: 100%; justify-content: flex-start; }
+  .pulse-card { padding: 13px 14px 13px 15px; }
+  .pulse-value { font-size: 21px; }
+  .pulse-ico { width: 26px; height: 26px; }
+}
+@media (max-width: 420px) {
+  .dash-pulse { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sk { animation: none; }
@@ -3820,10 +3851,15 @@ td {
   opacity: .9;
 }
 :root[data-theme='light'] .lp-aurora { opacity: .55; }
-.lp > *:not(.lp-aurora) { position: relative; z-index: 1; }
+/* content sits above the aurora; the nav is excluded so its own (higher)
+   z-index wins — otherwise this rule's specificity would flatten it to 1 and
+   the hero, later in the DOM, would paint over the (mobile) menu. */
+.lp > *:not(.lp-aurora):not(.lp-nav) { position: relative; z-index: 1; }
+.lp [id] { scroll-margin-top: 84px; }
+.lp main { padding-top: 68px; }
 
-/* nav */
-.lp-nav { position: sticky; top: 0; z-index: 50; transition: background .25s, border-color .25s, backdrop-filter .25s; border-bottom: 1px solid transparent; }
+/* nav — fixed so it never moves with the page */
+.lp-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; transition: background .25s, border-color .25s, backdrop-filter .25s; border-bottom: 1px solid transparent; }
 .lp-nav-solid {
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(14px) saturate(1.4);
@@ -4016,11 +4052,14 @@ td {
 }
 @media (max-width: 720px) {
   .lp-links {
-    position: fixed; inset: 68px 0 auto 0; flex-direction: column; gap: 0; background: var(--bg);
-    border-bottom: 1px solid var(--line); padding: 8px 24px 18px; transform: translateY(-140%); transition: transform .28s var(--lp-ease);
+    position: fixed; inset: 68px 0 auto 0; z-index: 60; flex-direction: column; gap: 0; background: var(--bg);
+    border-bottom: 1px solid var(--line); box-shadow: 0 24px 40px -20px rgba(0,0,0,.5);
+    padding: 8px 24px 18px; max-height: calc(100svh - 68px); overflow-y: auto;
+    transform: translateY(-140%); transition: transform .28s var(--lp-ease); will-change: transform;
   }
   .lp-links.open { transform: none; }
   .lp-links a { padding: 13px 0; width: 100%; border-bottom: 1px solid var(--line-soft); }
+  .lp-hero { padding-top: 28px; }
   .lp-burger { display: flex; }
   .lp-nav-actions .lp-btn-ghost { display: none; }
   .lp-grid, .lp-steps, .lp-plans { grid-template-columns: 1fr; }

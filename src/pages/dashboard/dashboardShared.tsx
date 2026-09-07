@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { officeLoginUrl } from '../../lib/tenant'
 
 export function timeOfDayGreeting(date: Date) {
   const hour = date.getHours()
@@ -28,11 +29,9 @@ export function untilLabel(iso: string): string {
   return `In ${Math.round(days / 7)} weeks`
 }
 
-const OFFICE_URL_ROOT_DOMAIN = 'bizzlivo.com'
-
 export function OfficeLoginLink({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false)
-  const url = `https://${slug}.${OFFICE_URL_ROOT_DOMAIN}`
+  const url = officeLoginUrl(slug)
 
   function copy() {
     navigator.clipboard?.writeText(url)
