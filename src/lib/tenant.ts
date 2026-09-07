@@ -40,3 +40,10 @@ export function officeLoginUrl(slug: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : `https://${ROOT_DOMAIN}`
   return `${origin}/o/${slug}/login`
 }
+
+// The origin an office's app is served from once subdomains are live —
+// https://<slug>.bizzlivo.com. Used to move a signed-in user off the apex
+// onto their office's own subdomain.
+export function officeSubdomainOrigin(slug: string): string {
+  return `https://${slug}.${ROOT_DOMAIN}`
+}

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
-import { getOfficeSlugFromHost } from './lib/tenant'
+import { getOfficeSlugFromHost, officeSubdomainOrigin, officeSubdomainsEnabled } from './lib/tenant'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import AppSkeleton, { PageSkeleton } from './components/AppSkeleton'
@@ -158,11 +158,34 @@ function RootGate() {
   )
 }
 
+// Once signed in, move the user off the apex (www.bizzlivo.com) onto their
+// office's own subdomain (<slug>.bizzlivo.com), preserving the path. Skips
+// the public / cross-office entry flows, where the apex host is deliberate
+// and the target office may not be the user's current one.
+const KEEP_ON_APEX = ['/invite/', '/join/', '/take/', '/o/', '/login', '/signup']
+
+function OfficeSubdomainRedirect() {
+  const { session, loading, currentMembership } = useAuth()
+  const { pathname, search } = useLocation()
+
+  useEffect(() => {
+    if (loading || !session || !officeSubdomainsEnabled()) return
+    if (getOfficeSlugFromHost(window.location.hostname)) return // already on a subdomain
+    const slug = currentMembership?.organization.slug
+    if (!slug) return
+    if (KEEP_ON_APEX.some((p) => pathname === p || pathname.startsWith(p))) return
+    window.location.replace(`${officeSubdomainOrigin(slug)}${pathname}${search}`)
+  }, [loading, session, currentMembership, pathname, search])
+
+  return null
+}
+
 export default function App() {
   const hostSlug = getOfficeSlugFromHost(window.location.hostname)
 
   return (
     <AuthProvider>
+      <OfficeSubdomainRedirect />
       <Suspense fallback={<AppSkeleton />}>
         <Routes>
           <Route path="/signup" element={<Signup />} />
