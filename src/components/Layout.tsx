@@ -7,6 +7,7 @@ import { PLAN_META } from '../lib/entitlements'
 import ThemeToggle from './ThemeToggle'
 import NotificationBell from './NotificationBell'
 import ProfileMenu from './ProfileMenu'
+import CommandK from './CommandK'
 
 const ADMIN_ROLES = new Set(['admin', 'trainer'])
 const MANAGE_ROLES = new Set(['admin'])
@@ -132,6 +133,14 @@ export default function Layout({ children }: { children: ReactNode }) {
   const orgId = currentMembership?.organization.id
   const { usage } = useOrgUsage(orgId)
   const badges = useStaffBadges(orgId, isAdmin)
+  const [cmdkOpen, setCmdkOpen] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdkOpen((v) => !v) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [switchOpen, setSwitchOpen] = useState(false)
@@ -412,11 +421,11 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <main className="app-main">
         <div className="topbar">
-          <div className="cmdbar" title="Global search — coming soon" aria-hidden>
+          <button type="button" className="cmdbar" onClick={() => setCmdkOpen(true)}>
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <span>Search members, training, quizzes, events…</span>
+            <span>Search members, training, events, prospects…</span>
             <kbd>⌘K</kbd>
-          </div>
+          </button>
 
           <button
             type="button"
@@ -434,6 +443,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
         <Fragment key={routeKey}>{children}</Fragment>
       </main>
+      <CommandK open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
     </div>
   )
 }

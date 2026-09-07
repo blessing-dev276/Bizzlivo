@@ -15,6 +15,7 @@ import {
 } from '../../lib/businessPath'
 import RecentActivity from '../../components/RecentActivity'
 import TodayActionCenter from './TodayActionCenter'
+import OfficeActivityFeed from '../../components/OfficeActivityFeed'
 import { DashboardSkeleton } from '../../components/AppSkeleton'
 import { timeOfDayGreeting } from './dashboardShared'
 import { loadMemberBalances, moneyList } from '../../lib/finance'
@@ -499,6 +500,7 @@ export default function MemberHome() {
         {/* ---- recent activity ---- */}
         <div className={upcoming.length > 0 ? 'col-8' : 'col-12'}>
           <RecentActivity compact limit={6} />
+          <OfficeActivityFeed orgId={orgId!} scope="mine" title="Your recent activity" limit={6} />
         </div>
       </div>
 

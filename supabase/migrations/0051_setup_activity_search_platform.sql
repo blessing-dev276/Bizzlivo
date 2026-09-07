@@ -151,35 +151,35 @@ begin
   if length(trim(coalesce(q, ''))) < 2 then return '[]'::jsonb; end if;
 
   with hits as (
-    select 'member' as kind, p.id, p.full_name as label, m.role::text as sublabel, '/members/' || p.id as route
-    from memberships m join profiles p on p.id = m.user_id
-    where m.org_id = p_org and m.status = 'active' and p.full_name ilike needle
-      and has_org_role(p_org, array['admin', 'trainer', 'team_leader'])
-    limit p_limit
+    (select 'member' as kind, p.id as id, p.full_name as label, m.role::text as sublabel, '/members/' || p.id as route
+     from memberships m join profiles p on p.id = m.user_id
+     where m.org_id = p_org and m.status = 'active' and p.full_name ilike needle
+       and has_org_role(p_org, array['admin', 'trainer', 'team_leader'])
+     limit p_limit)
     union all
-    select 'class', c.id, c.title, coalesce(c.area, 'Learning'), '/training/classes/' || c.id
-    from classes c where c.org_id = p_org and c.title ilike needle limit p_limit
+    (select 'class', c.id, c.title, coalesce(c.area, 'Learning'), '/training/classes/' || c.id
+     from classes c where c.org_id = p_org and c.title ilike needle limit p_limit)
     union all
-    select 'event', e.id, e.title, to_char(e.start_at, 'Mon DD'), '/events/' || e.id
-    from events e where e.org_id = p_org and e.title ilike needle limit p_limit
+    (select 'event', e.id, e.title, to_char(e.start_at, 'Mon DD'), '/events/' || e.id
+     from events e where e.org_id = p_org and e.title ilike needle limit p_limit)
     union all
-    select 'rank', r.id, r.name, 'Business Path rank', '/business-path'
-    from business_path_ranks r where r.org_id = p_org and r.name ilike needle limit p_limit
+    (select 'rank', r.id, r.name, 'Business Path rank', '/business-path'
+     from business_path_ranks r where r.org_id = p_org and r.name ilike needle limit p_limit)
     union all
-    select 'goal', g.id, g.title, 'Goal · ' || g.month, '/goals'
-    from member_monthly_goals g where g.org_id = p_org and g.user_id = auth.uid() and g.title ilike needle limit p_limit
+    (select 'goal', g.id, g.title, 'Goal · ' || g.month, '/goals'
+     from member_monthly_goals g where g.org_id = p_org and g.user_id = auth.uid() and g.title ilike needle limit p_limit)
     union all
-    select 'network_prospect', x.id, x.full_name, 'Network prospect', '/my-team?tab=prospects'
-    from network_marketing_contacts x where x.org_id = p_org and x.user_id = auth.uid() and x.full_name ilike needle limit p_limit
+    (select 'network_prospect', x.id, x.full_name, 'Network prospect', '/my-team?tab=prospects'
+     from network_marketing_contacts x where x.org_id = p_org and x.user_id = auth.uid() and x.full_name ilike needle limit p_limit)
     union all
-    select 'freelance_prospect', fp.id, fp.name, 'Freelance prospect', '/freelance?view=prospects'
-    from freelance_prospects fp where fp.org_id = p_org and fp.member_id = auth.uid() and fp.name ilike needle limit p_limit
+    (select 'freelance_prospect', fp.id, fp.name, 'Freelance prospect', '/freelance?view=prospects'
+     from freelance_prospects fp where fp.org_id = p_org and fp.member_id = auth.uid() and fp.name ilike needle limit p_limit)
     union all
-    select 'freelance_client', fc.id, fc.name, 'Freelance client', '/freelance?view=clients'
-    from freelance_clients fc where fc.org_id = p_org and fc.member_id = auth.uid() and fc.name ilike needle limit p_limit
+    (select 'freelance_client', fc.id, fc.name, 'Freelance client', '/freelance?view=clients'
+     from freelance_clients fc where fc.org_id = p_org and fc.member_id = auth.uid() and fc.name ilike needle limit p_limit)
     union all
-    select 'freelance_project', pj.id, pj.title, 'Freelance project', '/freelance?view=projects'
-    from freelance_projects pj where pj.org_id = p_org and pj.member_id = auth.uid() and pj.title ilike needle limit p_limit
+    (select 'freelance_project', pj.id, pj.title, 'Freelance project', '/freelance?view=projects'
+     from freelance_projects pj where pj.org_id = p_org and pj.member_id = auth.uid() and pj.title ilike needle limit p_limit)
   )
   select coalesce(jsonb_agg(jsonb_build_object('kind', kind, 'id', id, 'label', label, 'sublabel', sublabel, 'route', route)), '[]'::jsonb)
   into result from hits;

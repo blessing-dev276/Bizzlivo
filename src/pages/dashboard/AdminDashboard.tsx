@@ -13,6 +13,8 @@ import PeopleHealth from './PeopleHealth'
 import OfficeOverview from './OfficeOverview'
 import OfficeInsights, { officeHasInsights } from './OfficeInsights'
 import WorkplaceFooter from './WorkplaceFooter'
+import OfficeSetupCard from './OfficeSetupCard'
+import OfficeActivityFeed from '../../components/OfficeActivityFeed'
 
 // The office command center — for admin and trainer roles.
 export default function AdminDashboard() {
@@ -39,6 +41,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        <OfficeSetupCard orgId={orgId} />
+
         <OfficePulse data={data} loading={loading} />
 
         <div className="dash-grid">
@@ -54,6 +58,9 @@ export default function AdminDashboard() {
 
           <div className={showInsights ? 'col-7' : 'col-12'}>
             <RecentActivity compact limit={7} />
+          </div>
+          <div className={showInsights ? 'col-5' : 'col-12'}>
+            <OfficeActivityFeed orgId={orgId} limit={8} />
           </div>
           {showInsights && <OfficeInsights data={data} role={role} />}
         </div>

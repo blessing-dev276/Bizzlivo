@@ -478,9 +478,21 @@ The system has general leaderboard views based on attempts/performance. The newe
 
 `report_member(p_org, p_user)` (0041/0042) is extended in 0050 with freelance counts, verified freelance earnings, `finance_member_balances`, team, membership status/role, goals-this-month, goal-changes-requested, and rank-start — and its guard is widened so a **team leader** can open a profile for a member of a group they lead. `/members/:userId` (`MemberProfile360.tsx`, admin + team_leader) has Overview / Business Path / Goals / Freelance tabs; `member360Attention()` derives the "needs attention" list (no goals this month, changes requested, overdue follow-ups, BP stalled ≥21 days at <50%). Linked from the member drawer in `/invites`.
 
-### Recent activity (unchanged)
+### Office setup wizard (`0051`)
 
-Recent activity is still assembled client-side by querying several domain tables and normalizing timestamps. A dedicated `activity_log` (Phase 7 of the connected-OS work) is not built yet.
+`organizations.setup_dismissed_at` is the only stored state; the 7-step checklist (office profile / logo / Business Path / Learning Center / invite members / Finance currency / first event) is **derived** by `src/lib/officeSetup.ts` from cheap `count`/`exists` checks. `OfficeSetupCard.tsx` shows on the admin dashboard until 7/7 or dismissed.
+
+### Office Activity / Pulse (`0051`)
+
+`activity_log(org_id, actor_id, verb, entity_type, entity_id, summary, created_at)` is fed by `AFTER` triggers on the meaningful events only: `memberships` insert (member joined), `network_marketing_contacts` insert (prospect added), `member_monthly_goals` → submitted/approved, `member_rank_history` insert (rank promoted), `freelance_projects` → completed, `attempts` → passed. RLS: members read their own `actor_id` rows; admin/trainer read the org; team leaders read their team. `OfficeActivityFeed.tsx` renders it (office feed on the admin dashboard, `scope="mine"` personal feed on the member dashboard). The old frontend `RecentActivity` fan-out stays alongside it for now.
+
+### Global search / Command-K (`0051`)
+
+`search_office(p_org, q, limit)` — one `security definer` RPC, `is_org_member` gated, `UNION ALL` of `ILIKE` over members (staff only), classes, events, ranks, and the caller's own goals / network prospects / freelance prospects·clients·projects; returns `[{kind, id, label, sublabel, route}]`. `src/components/CommandK.tsx` is a ⌘/Ctrl-K modal (debounced 220ms) mounted in `Layout`; the topbar search box opens it. Below results it lists role-gated quick actions (add prospect, create goal, create event, record finance order, invite member, new announcement).
+
+### Bizzlivo Super Admin (`/platform`, `0051` + `0003`)
+
+Entirely separate from office roles. `platform_admins` + `is_platform_admin()` (0003) gate a standalone `/platform/*` shell (`src/pages/platform/Platform.tsx`) rendered **outside** `<Protected>` — it does its own auth/platform-admin check. Data: `platform_overview()` (0051 — org counts, users, active-7d from `activity_log`, MRR from `subscriptions × plan_limits`, monthly AI usage, newest orgs) plus the existing 0003 RPCs `admin_list_offices()` / `admin_get_office_detail(org)` / `admin_set_office_status(org, status)` / `admin_set_plan_tier(org, plan)` (all `is_platform_admin`-guarded, and status/plan changes write `audit_log`). Pages: Overview, Organizations list, Org detail (suspend / reactivate / plan override). Office admins can never reach these — the RPCs return empty / raise for non-platform-admins and the route redirects.
 
 ## 16. Billing and plan enforcement
 

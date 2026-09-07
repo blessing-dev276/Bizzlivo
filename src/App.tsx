@@ -67,6 +67,7 @@ const NotificationCenter = lazy(() => import('./pages/notifications/Notification
 const OfficeUpdates = lazy(() => import('./pages/announcements/OfficeUpdates'))
 const AnnouncementsAdmin = lazy(() => import('./pages/announcements/AnnouncementsAdmin'))
 const MemberProfile360 = lazy(() => import('./pages/members/MemberProfile360'))
+const Platform = lazy(() => import('./pages/platform/Platform'))
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 const FinanceWorkspace = lazy(() => import('./pages/finance/FinanceWorkspace'))
 
@@ -234,6 +235,8 @@ export default function App() {
           <Route path="/exams/*" element={<LegacyRedirect from="/exams" to="/quizzes" />} />
           <Route path="/cbt/*" element={<LegacyRedirect from="/cbt" to="/my-quizzes" />} />
           <Route path="/team-performance/*" element={<LegacyRedirect from="/team-performance" to="/team" />} />
+
+          <Route path="/platform/*" element={<Suspense fallback={<AppSkeleton />}><Platform /></Suspense>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
