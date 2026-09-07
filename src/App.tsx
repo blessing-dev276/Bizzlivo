@@ -27,7 +27,6 @@ const ExamAnalytics = lazy(() => import('./pages/quizzes/ExamAnalytics'))
 const AttemptDetail = lazy(() => import('./pages/quizzes/AttemptDetail'))
 const ExamRoster = lazy(() => import('./pages/quizzes/ExamRoster'))
 
-const Billing = lazy(() => import('./pages/billing/Billing'))
 const Settings = lazy(() => import('./pages/settings/Settings'))
 
 const Invites = lazy(() => import('./pages/invites/Invites'))
@@ -185,7 +184,8 @@ export default function App() {
           <Route path="/quizzes/:examId/analytics/:attemptId" element={<Protected><AttemptDetail /></Protected>} />
           <Route path="/quizzes/:examId/roster" element={<Protected><ExamRoster /></Protected>} />
 
-          <Route path="/billing" element={<Protected><Billing /></Protected>} />
+          {/* Billing now lives inside Settings — keep the old path working. */}
+          <Route path="/billing" element={<Navigate to="/settings?tab=billing" replace />} />
           <Route path="/settings" element={<Protected><Settings /></Protected>} />
           <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 

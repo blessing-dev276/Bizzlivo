@@ -216,7 +216,7 @@ export default function OfficeSettings() {
                 <strong>Custom logo &amp; brand colour</strong>
                 <p>Available on the Business plan — replace the Bizzlivo mark with your own across the workspace.</p>
               </div>
-              <Link to="/billing" className="btn-primary-link">Upgrade</Link>
+              <Link to="/settings?tab=billing" className="btn-primary-link">Upgrade</Link>
             </div>
           )}
         </section>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/AuthContext'
 import Billing from '../billing/Billing'
 import ProfileSettings from './ProfileSettings'
@@ -9,13 +9,33 @@ import MembershipDanger from './MembershipDanger'
 
 // Profile + Notifications are for everyone; Office and Billing are admin-only.
 type Section = 'profile' | 'notifications' | 'security' | 'office' | 'billing'
+const SECTIONS: Section[] = ['profile', 'notifications', 'security', 'office', 'billing']
 
 const ADMIN_ROLES = new Set(['admin'])
 
 export default function Settings() {
   const { currentMembership } = useAuth()
   const isAdmin = currentMembership ? ADMIN_ROLES.has(currentMembership.role) : false
-  const [section, setSection] = useState<Section>('profile')
+
+  // The active tab lives in the URL (?tab=billing) so links elsewhere in
+  // the app — "Upgrade" buttons especially — can deep-link straight to a
+  // section instead of a standalone page.
+  const [params, setParams] = useSearchParams()
+  const requested = params.get('tab') as Section | null
+  const isAllowed = requested != null && SECTIONS.includes(requested) && (!['office', 'billing'].includes(requested) || isAdmin)
+  const section: Section = isAllowed ? (requested as Section) : 'profile'
+
+  const setSection = (next: Section) => {
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev)
+        if (next === 'profile') p.delete('tab')
+        else p.set('tab', next)
+        return p
+      },
+      { replace: true },
+    )
+  }
 
   return (
     <div className="page">

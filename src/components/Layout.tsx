@@ -521,7 +521,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {canManageBilling && planLabel && (
             <div className="plan-row">
               <span className={`badge ${planBadgeClass}`}>{planLabel}</span>
-              {!isTopTier && <Link to="/billing" className="plan-upgrade-btn">Upgrade</Link>}
+              {!isTopTier && <Link to="/settings?tab=billing" className="plan-upgrade-btn">Upgrade</Link>}
             </div>
           )}
 

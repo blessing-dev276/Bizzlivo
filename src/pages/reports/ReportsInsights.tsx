@@ -268,7 +268,7 @@ function OverviewTab({
               Export CSV
             </button>
           ) : (
-            <Link to="/billing" className="rp-btn ghost sm" title="CSV export is on the Business plan">
+            <Link to="/settings?tab=billing" className="rp-btn ghost sm" title="CSV export is on the Business plan">
               Export · Business
             </Link>
           ))
