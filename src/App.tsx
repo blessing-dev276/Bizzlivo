@@ -51,6 +51,7 @@ const MyTeam = lazy(() => import('./pages/teams/MyTeam'))
 const Events = lazy(() => import('./pages/events/Events'))
 const EventForm = lazy(() => import('./pages/events/EventForm'))
 const EventDetail = lazy(() => import('./pages/events/EventDetail'))
+const OccurrenceDetail = lazy(() => import('./pages/events/OccurrenceDetail'))
 const Leaderboard = lazy(() => import('./pages/leaderboard/Leaderboard'))
 
 const Assignments = lazy(() => import('./pages/assignments/Assignments'))
@@ -251,6 +252,7 @@ export default function App() {
           <Route path="/settings/notifications" element={<Protected><Settings section="notifications" /></Protected>} />
           <Route path="/settings/security" element={<Protected><Settings section="security" /></Protected>} />
           <Route path="/settings/office" element={<Protected><Settings section="office" /></Protected>} />
+          <Route path="/settings/finance" element={<Protected><Settings section="finance" /></Protected>} />
           <Route path="/settings/billing" element={<Protected><Settings section="billing" /></Protected>} />
           <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 
@@ -281,6 +283,7 @@ export default function App() {
           <Route path="/events/new" element={<Protected><EventForm /></Protected>} />
           <Route path="/events/:eventId" element={<Protected><EventDetail /></Protected>} />
           <Route path="/events/:eventId/edit" element={<Protected><EventForm /></Protected>} />
+          <Route path="/events/:eventId/:date" element={<Protected><OccurrenceDetail /></Protected>} />
 
           <Route path="/leaderboard" element={<Protected><Leaderboard /></Protected>} />
 
