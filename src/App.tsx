@@ -62,7 +62,6 @@ const SubmitAssignment = lazy(() => import('./pages/assignments/SubmitAssignment
 const BusinessPathHub = lazy(() => import('./pages/business-path/BusinessPathHub'))
 const RankPathBuilder = lazy(() => import('./pages/business-path/RankPathBuilder'))
 const MonthlyGoals = lazy(() => import('./pages/goals/MonthlyGoals'))
-const FreelanceWorkspace = lazy(() => import('./pages/freelance/FreelanceWorkspace'))
 const GoalsReview = lazy(() => import('./pages/goals/GoalsReview'))
 const NotificationCenter = lazy(() => import('./pages/notifications/NotificationCenter'))
 const OfficeUpdates = lazy(() => import('./pages/announcements/OfficeUpdates'))
@@ -277,7 +276,6 @@ export default function App() {
           <Route path="/team" element={<Protected><TeamPerformance /></Protected>} />
           <Route path="/team/:teamId" element={<Protected><TeamDetail /></Protected>} />
           <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
-          <Route path="/freelance" element={<Protected><FreelanceWorkspace /></Protected>} />
 
           <Route path="/events" element={<Protected><Events /></Protected>} />
           <Route path="/events/new" element={<Protected><EventForm /></Protected>} />

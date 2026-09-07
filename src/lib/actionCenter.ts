@@ -1,15 +1,14 @@
 // Action Center — "what should I do today?" for the member dashboard.
 // Derives a single prioritized list of Action objects from the source
-// systems (Business Path, Goals, Network, Freelance, Finance). Nothing is
+// systems (Business Path, Goals, Network, Finance). Nothing is
 // stored — rebuilt on every dashboard load, so it can never go stale.
 import { supabase } from './supabase'
 import type { PathState } from './businessPath'
 import { monthKeyOf, targetMet } from './goals'
-import { attentionFrom, loadFreelance } from './freelance'
 import { loadMemberBalances } from './finance'
 import type { MemberMonthlyGoal, MoneyByCurrency } from '../types/database'
 
-export type ActionCategory = 'goals' | 'business_path' | 'network' | 'freelance' | 'finance'
+export type ActionCategory = 'goals' | 'business_path' | 'network' | 'finance'
 export type ActionPriority = 'critical' | 'high' | 'normal'
 
 export interface Action {
@@ -27,7 +26,6 @@ export const CATEGORY_LABEL: Record<ActionCategory, string> = {
   goals: 'Goals',
   business_path: 'Business Path',
   network: 'Network',
-  freelance: 'Freelance',
   finance: 'Finance',
 }
 
@@ -39,7 +37,7 @@ export async function loadActions(orgId: string, userId: string, path: PathState
   const monthKey = monthKeyOf(new Date())
   const monthLabel = new Date().toLocaleDateString(undefined, { month: 'long' })
 
-  const [goalsRes, netRes, fl, bal] = await Promise.all([
+  const [goalsRes, netRes, bal] = await Promise.all([
     supabase
       .from('member_monthly_goals')
       .select('*')
@@ -49,7 +47,6 @@ export async function loadActions(orgId: string, userId: string, path: PathState
       .from('network_marketing_contacts')
       .select('full_name, stage, next_follow_up_at')
       .eq('org_id', orgId).eq('user_id', userId),
-    loadFreelance(orgId, userId).catch(() => null),
     loadMemberBalances(orgId, userId).catch(() => null),
   ])
 
@@ -112,18 +109,6 @@ export async function loadActions(orgId: string, userId: string, path: PathState
       description: overdue[0].full_name,
       ctaLabel: 'View Follow-ups', ctaRoute: '/my-team?tab=followups',
     })
-  }
-
-  // ---- Freelance ----
-  if (fl) {
-    const a = attentionFrom(fl)
-    if (a.projectsOverdue) {
-      out.push({ id: 'fl-overdue', category: 'freelance', priority: 'critical', title: `${a.projectsOverdue} freelance project${a.projectsOverdue > 1 ? 's' : ''} past due`, ctaLabel: 'View', ctaRoute: '/freelance?view=projects' })
-    }
-    const due = a.prospectFollowupsDue + a.projectFollowupsDue
-    if (due) {
-      out.push({ id: 'fl-followups', category: 'freelance', priority: 'high', title: `${due} freelance follow-up${due > 1 ? 's' : ''} due`, ctaLabel: 'View', ctaRoute: '/freelance' })
-    }
   }
 
   // ---- Finance ----

@@ -14,7 +14,6 @@ const VERB_ICON: Record<string, string> = {
   goal_submitted: '📝',
   goal_approved: '✅',
   rank_promoted: '🏆',
-  freelance_completed: '📦',
   exam_passed: '🎓',
 }
 

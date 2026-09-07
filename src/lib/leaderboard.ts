@@ -7,7 +7,7 @@
 import { supabase } from './supabase'
 
 export type LbPeriod = 'week' | 'month' | 'all'
-export type LbCategory = 'overall' | 'learning' | 'business_path' | 'network' | 'freelance' | 'goals'
+export type LbCategory = 'overall' | 'learning' | 'business_path' | 'network' | 'goals'
 
 export const PERIODS: { id: LbPeriod; label: string }[] = [
   { id: 'week', label: 'This Week' },
@@ -20,7 +20,6 @@ export const CATEGORY_TABS: { id: LbCategory; label: string }[] = [
   { id: 'learning', label: 'Learning' },
   { id: 'business_path', label: 'Business Path' },
   { id: 'network', label: 'Network' },
-  { id: 'freelance', label: 'Freelance' },
   { id: 'goals', label: 'Goals' },
 ]
 
@@ -28,7 +27,6 @@ export const CATEGORY_LABEL: Record<string, string> = {
   learning: 'Learning',
   business_path: 'Business Path',
   network: 'Network',
-  freelance: 'Freelance',
   goals: 'Goals',
   events: 'Events',
   adjustment: 'Adjustments',
@@ -43,7 +41,6 @@ export interface LeaderboardRow {
   learning: number
   business_path: number
   network: number
-  freelance: number
   goals: number
   events: number
   adjustment: number
@@ -82,7 +79,6 @@ export interface LeaderboardSettings {
   include_business_path: boolean
   include_goals: boolean
   include_network: boolean
-  include_freelance: boolean
   include_events: boolean
   default_period: LbPeriod
   team_board_enabled: boolean
@@ -102,7 +98,6 @@ const INCLUDE_KEYS = [
   ['include_learning', 'Learning'],
   ['include_business_path', 'Business Path'],
   ['include_network', 'Network'],
-  ['include_freelance', 'Freelance'],
   ['include_goals', 'Goals'],
   ['include_events', 'Events'],
 ] as const

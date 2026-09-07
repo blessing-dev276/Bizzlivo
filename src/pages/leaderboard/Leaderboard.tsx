@@ -42,7 +42,7 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string; si
   return <div className="avatar" style={{ width: size, height: size }} title={name}>{initials(name)}</div>
 }
 
-const CATEGORY_KEYS = ['learning', 'business_path', 'network', 'freelance', 'goals'] as const
+const CATEGORY_KEYS = ['learning', 'business_path', 'network', 'goals'] as const
 
 // ============================================================
 // Member-facing board
@@ -187,7 +187,6 @@ function Board({ orgId, userId, settings }: { orgId: string; userId: string; set
                     <th className="lb-hide-md">Learning</th>
                     <th className="lb-hide-md">Business Path</th>
                     <th className="lb-hide-md">Network</th>
-                    <th className="lb-hide-md">Freelance</th>
                     <th className="lb-hide-md">Goals</th>
                     <th>Points</th>
                   </tr>
@@ -212,7 +211,6 @@ function Board({ orgId, userId, settings }: { orgId: string; userId: string; set
                       <td className="lb-hide-md">{r.learning}</td>
                       <td className="lb-hide-md">{r.business_path}</td>
                       <td className="lb-hide-md">{r.network}</td>
-                      <td className="lb-hide-md">{r.freelance}</td>
                       <td className="lb-hide-md">{r.goals}</td>
                       <td><strong>{r.total}</strong></td>
                     </tr>

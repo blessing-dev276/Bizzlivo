@@ -65,7 +65,6 @@ export const HELP_ARTICLES: { title: string; body: string; to?: string }[] = [
   { title: 'Business Path', body: 'Your office defines a ladder of ranks. Each rank has required Learning and Task items — finish them all to be promoted (automatically, or on staff approval).', to: '/business-path' },
   { title: 'Goals', body: 'Plan monthly and 90-day goals, track progress, then submit finished goals for office review. Approved goals can satisfy Business Path requirements.', to: '/goals' },
   { title: 'My Network', body: 'Track prospects and follow-ups, see who you sponsored, and share your referral link so new members join connected to you.', to: '/my-team' },
-  { title: 'Freelance', body: 'Run your freelancing pipeline: prospects → clients → projects. When an order is paid, your office admin records it in Finance and links it to the project.', to: '/freelance' },
   { title: 'Wallet & Finance', body: 'Your Wallet shows verified earnings and available balance. Withdrawals are requested from the Wallet and approved by your office.', to: '/wallet' },
   { title: 'Notifications', body: 'The Notification Center collects everything that needs your attention. Choose which categories you receive in Settings → Notifications.', to: '/notifications' },
 ]

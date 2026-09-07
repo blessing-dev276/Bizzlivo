@@ -13,13 +13,12 @@ interface Hit {
 
 const KIND_ICON: Record<string, string> = {
   member: '👤', class: '📘', event: '📅', rank: '🏆', goal: '🎯',
-  network_prospect: '🕸', freelance_prospect: '💼', freelance_client: '🤝', freelance_project: '📦',
+  network_prospect: '🕸',
 }
 
 interface QuickAction { label: string; route: string; roles: string[] }
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Add network prospect', route: '/my-team?tab=prospects', roles: ['member', 'team_leader', 'trainer', 'admin'] },
-  { label: 'Add freelance prospect', route: '/freelance?view=prospects', roles: ['member', 'team_leader', 'trainer', 'admin'] },
   { label: 'Create a goal', route: '/goals', roles: ['member', 'team_leader', 'trainer', 'admin'] },
   { label: 'Create an event', route: '/events/new', roles: ['admin', 'trainer'] },
   { label: 'Record a finance order', route: '/finance', roles: ['admin'] },

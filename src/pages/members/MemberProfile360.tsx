@@ -6,15 +6,12 @@ import { loadMember360, member360Attention, type Member360 } from '../../lib/off
 import { moneyList } from '../../lib/finance'
 import type { MemberMonthlyGoal } from '../../types/database'
 import { STATUS_META as GOAL_STATUS_META, goalPercent } from '../../lib/goals'
-import type { FreelanceProject, FreelanceProspect } from '../../lib/freelance'
-import { PROJECT_STATUS, PROSPECT_STATUS } from '../../lib/freelance'
 
-type Tab = 'overview' | 'business-path' | 'goals' | 'freelance'
+type Tab = 'overview' | 'business-path' | 'goals'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'business-path', label: 'Business Path' },
   { id: 'goals', label: 'Goals' },
-  { id: 'freelance', label: 'Freelance' },
 ]
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '—')
@@ -85,8 +82,6 @@ export default function MemberProfile360() {
             <Metric label="Goals this month" value={m.goals_this_month} sub={`${m.goals_done}/${m.goals_total} approved all-time`} />
             <Metric label="Direct members" value={m.direct_members} />
             <Metric label="Network prospects" value={m.prospects} sub={m.prospect_followups_overdue > 0 ? `${m.prospect_followups_overdue} overdue` : undefined} />
-            <Metric label="Freelance clients" value={m.freelance_clients} sub={`${m.freelance_projects_open} open project${m.freelance_projects_open === 1 ? '' : 's'}`} />
-            <Metric label="Verified freelance earnings" value={`₦${Number(m.freelance_verified_earnings).toLocaleString()}`} />
             <Metric label="Available balance" value={bal || '—'} />
             <Metric label="Exams passed" value={m.exams_passed} sub={`last active ${fmt(m.last_activity)}`} />
           </div>
@@ -120,7 +115,6 @@ export default function MemberProfile360() {
       )}
 
       {tab === 'goals' && <GoalsTab orgId={orgId} userId={userId} />}
-      {tab === 'freelance' && <FreelanceTab orgId={orgId} userId={userId} />}
     </div>
   )
 }
@@ -163,43 +157,3 @@ function GoalsTab({ orgId, userId }: { orgId: string; userId: string }) {
   )
 }
 
-function FreelanceTab({ orgId, userId }: { orgId: string; userId: string }) {
-  const [d, setD] = useState<{ prospects: FreelanceProspect[]; projects: FreelanceProject[] } | null>(null)
-  useEffect(() => {
-    Promise.all([
-      supabase.from('freelance_prospects').select('*').eq('org_id', orgId).eq('member_id', userId).order('created_at', { ascending: false }),
-      supabase.from('freelance_projects').select('*').eq('org_id', orgId).eq('member_id', userId).order('created_at', { ascending: false }),
-    ]).then(([p, pr]) => setD({ prospects: (p.data as FreelanceProspect[]) ?? [], projects: (pr.data as FreelanceProject[]) ?? [] }))
-  }, [orgId, userId])
-  if (!d) return <p className="empty-row">Loading…</p>
-  return (
-    <>
-      <section className="gl-drawer-sec">
-        <h4>Prospects ({d.prospects.length})</h4>
-        {d.prospects.length === 0 ? <p className="empty-row">None.</p> : (
-          <div className="rp-table-wrap"><table className="rp-table">
-            <thead><tr><th>Name</th><th>Platform</th><th>Status</th></tr></thead>
-            <tbody>{d.prospects.map((p) => (
-              <tr key={p.id}><td>{p.name}</td><td className="rp-dim">{p.platform ?? '—'}</td>
-                <td><span className={`gl-tag ${PROSPECT_STATUS.find((s) => s.id === p.status)?.tone}`}>{PROSPECT_STATUS.find((s) => s.id === p.status)?.label}</span></td></tr>
-            ))}</tbody>
-          </table></div>
-        )}
-      </section>
-      <section className="gl-drawer-sec">
-        <h4>Projects ({d.projects.length})</h4>
-        {d.projects.length === 0 ? <p className="empty-row">None.</p> : (
-          <div className="rp-table-wrap"><table className="rp-table">
-            <thead><tr><th>Project</th><th>Value</th><th>Due</th><th>Status</th><th>Finance</th></tr></thead>
-            <tbody>{d.projects.map((p) => (
-              <tr key={p.id}><td>{p.title}</td><td className="rp-dim">{p.order_value ? `${p.currency ?? '₦'} ${Number(p.order_value).toLocaleString()}` : '—'}</td>
-                <td className="rp-dim">{p.due_date ? new Date(p.due_date).toLocaleDateString() : '—'}</td>
-                <td><span className={`gl-tag ${PROJECT_STATUS.find((s) => s.id === p.status)?.tone}`}>{PROJECT_STATUS.find((s) => s.id === p.status)?.label}</span></td>
-                <td className="rp-dim">{p.finance_order_id ? 'Linked' : '—'}</td></tr>
-            ))}</tbody>
-          </table></div>
-        )}
-      </section>
-    </>
-  )
-}

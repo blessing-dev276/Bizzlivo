@@ -5,7 +5,7 @@ import type { PathState } from '../../lib/businessPath'
 
 // The member dashboard's "what should I do today?" panel. One prioritized
 // list built from every source system (Business Path, Goals, Network,
-// Freelance, Finance) — see src/lib/actionCenter.ts.
+// Finance) — see src/lib/actionCenter.ts.
 export default function TodayActionCenter({
   orgId,
   userId,

@@ -159,11 +159,6 @@ export interface Member360 {
   direct_members: number
   prospects: number
   prospect_followups_overdue: number
-  freelance_prospects: number
-  freelance_clients: number
-  freelance_projects_open: number
-  freelance_projects_overdue: number
-  freelance_verified_earnings: number
   available_balance: unknown
   income_total: number
   exams_passed: number
@@ -184,7 +179,6 @@ export function member360Attention(m: Member360): string[] {
   if (m.goals_this_month === 0) out.push('No goals set for this month')
   if (m.goals_changes_requested > 0) out.push(`${m.goals_changes_requested} goal change${m.goals_changes_requested > 1 ? 's' : ''} requested`)
   if (m.prospect_followups_overdue > 0) out.push(`${m.prospect_followups_overdue} overdue prospect follow-up${m.prospect_followups_overdue > 1 ? 's' : ''}`)
-  if (m.freelance_projects_overdue > 0) out.push(`${m.freelance_projects_overdue} freelance project${m.freelance_projects_overdue > 1 ? 's' : ''} past due`)
   if (m.rank_started_at) {
     const days = Math.floor((Date.now() - new Date(m.rank_started_at).getTime()) / 86_400_000)
     if (days >= 21 && m.bp_percent < 50) out.push(`Business Path stalled ${days} days at ${m.bp_percent}%`)
