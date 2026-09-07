@@ -68,19 +68,15 @@ npm run dev
 
 ## 6. Deploy
 
-Live at **https://hq360-cbt.web.app** (Firebase Hosting, project `hq360-cbt`,
-account sterwanmarvi16@gmail.com). `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`
-are baked into the build at build time from `.env`, so redeploy after any
-frontend change (not needed for Edge Function or migration changes — those
-deploy separately via `supabase` as described above):
+Hosted on **Vercel** — the repo is connected to the Vercel dashboard, so every
+push to `main` deploys automatically and pull requests get preview URLs. Set
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_PAYSTACK_PUBLIC_KEY` as
+Environment Variables in Vercel Project Settings; they're baked into the build at
+build time. Edge Function and migration changes deploy separately via `supabase`
+as described above.
 
-```bash
-npm run build
-firebase deploy --only hosting
-```
-
-`firebase.json` rewrites all paths to `/index.html` so React Router's
-client-side routes work on hard refresh/deep links.
+`vercel.json` rewrites all paths to `/index.html` so React Router's client-side
+routes work on hard refresh/deep links, and sets asset caching / security headers.
 
 ## 7. Billing (Paystack)
 
