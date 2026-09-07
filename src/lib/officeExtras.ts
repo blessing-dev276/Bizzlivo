@@ -46,9 +46,17 @@ export interface NotificationPrefs {
   finance: boolean
   events: boolean
   announcements: boolean
+  // Email mirror (0053). email_account is always-on and not user-editable.
+  email_goals: boolean
+  email_finance: boolean
+  email_events: boolean
+  email_announcements: boolean
+  email_learning: boolean
 }
 export const DEFAULT_PREFS: NotificationPrefs = {
   goal_reminders: true, learning: true, finance: true, events: true, announcements: true,
+  email_goals: true, email_finance: true, email_events: true, email_announcements: true,
+  email_learning: false,
 }
 export async function loadPrefs(userId: string): Promise<NotificationPrefs> {
   const { data } = await supabase.from('notification_prefs').select('*').eq('user_id', userId).maybeSingle()

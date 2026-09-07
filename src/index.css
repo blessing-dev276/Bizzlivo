@@ -426,15 +426,15 @@ label {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
 }
 .sidebar-nav a {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-dim);
   transition: background-color 0.15s, color 0.15s;
@@ -453,9 +453,9 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-dim);
   background: transparent;
@@ -480,12 +480,16 @@ label {
 .nav-subgroup {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-left: 14px;
-  margin: 2px 0 4px;
+  gap: 1px;
+  padding-left: 12px;
+  margin: 1px 0 3px 6px;
   border-left: 1px solid var(--line);
 }
-.nav-subgroup a { padding: 8px 12px; font-size: 13.5px; }
+.nav-subgroup a { padding: 6px 12px; font-size: 13px; }
+/* Submenu active state — lighter than a top-level active row: no fill,
+   just a subtle accent rail + brighter text. */
+.sidebar-sec .nav-subgroup a.active { background: transparent; color: var(--text); box-shadow: inset 2px 0 0 var(--gold); }
+.sidebar-sec .nav-subgroup a.active .nav-ico { color: var(--gold); }
 .soon-badge {
   padding: 1px 7px;
   font-size: 9.5px;
@@ -1985,10 +1989,10 @@ td {
 /* ============================================================
    Sidebar — grouped nav (member view), collapse toggle, log-out button
    ============================================================ */
-.sidebar-sec { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.sidebar-sec { display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px; }
 .sidebar-sec-label {
   font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--text-faint); padding: 6px 12px 4px;
+  color: var(--text-faint); padding: 9px 12px 3px;
 }
 .sidebar-nav .nav-ico {
   width: 16px; height: 16px; margin-right: 10px; stroke: currentColor; fill: none;

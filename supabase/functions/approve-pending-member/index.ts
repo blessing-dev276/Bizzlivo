@@ -8,6 +8,7 @@
 // Body: { pendingMemberId, siteUrl }   (siteUrl = window.location.origin of the caller)
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { sendTransactionalEmail } from '../_shared/email.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,8 +36,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    if (!resendKey) return jsonResponse({ error: 'Server misconfigured: RESEND_API_KEY not set.' }, 500)
+    // RESEND_API_KEY absence no longer blocks approval — the invite is
+    // still created and the link returned; the email step just reports
+    // emailSent:false (handled below).
 
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -95,40 +97,41 @@ Deno.serve(async (req) => {
     const inviteUrl = `${siteUrl}/invite/${token}`
     const loginUrl = `${siteUrl}/o/${org.slug}/login`
 
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        'content-type': 'application/json',
+    const emailRes = await sendTransactionalEmail({
+      db,
+      orgId: pending.org_id,
+      emailType: 'member_invite',
+      templateType: 'member_invite',
+      templateData: {
+        subject: `You've been invited to join ${org.name} on Bizzlivo`,
+        headline: `Join ${org.name} on Bizzlivo`,
+        recipient_name: pending.full_name,
+        invite_url: inviteUrl,
+        login_url: loginUrl,
+        expires_in_days: INVITE_EXPIRY_DAYS,
       },
-      body: JSON.stringify({
-        from: 'Bizzlivo <onboarding@resend.dev>',
-        to: pending.email,
-        subject: `You're in! Join ${org.name} on Bizzlivo`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color: #12161d;">
-            <h2 style="margin-bottom: 4px;">Welcome to ${org.name}</h2>
-            <p style="color: #5b6472;">Hi ${pending.full_name}, your request to join ${org.name} on Bizzlivo has been approved.</p>
-            <p>
-              <a href="${inviteUrl}" style="display: inline-block; background: #b9761a; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                Set your password &amp; join
-              </a>
-            </p>
-            <p style="color: #5b6472; font-size: 13px;">This link expires in ${INVITE_EXPIRY_DAYS} days.</p>
-            <p style="color: #5b6472; font-size: 13px; margin-top: 24px;">
-              After that, bookmark your office's login page for next time:<br />
-              <a href="${loginUrl}">${loginUrl}</a>
-            </p>
-          </div>
-        `,
-      }),
+      recipientEmail: pending.email,
+    })
+
+    await db.rpc('log_email_send', {
+      p_org: pending.org_id,
+      p_recipient_user: null,
+      p_recipient_email: pending.email,
+      p_email_type: 'member_invite',
+      p_category: 'invite',
+      p_subject: emailRes.subject ?? null,
+      p_status: emailRes.ok ? 'sent' : 'failed',
+      p_provider_message_id: emailRes.id ?? null,
+      p_dedupe_key: `invite:${token}`,
+      p_related_type: 'invite',
+      p_related_id: null,
+      p_error: emailRes.ok ? null : (emailRes.error ?? '').slice(0, 500),
     })
 
     if (!emailRes.ok) {
-      const errText = await emailRes.text()
       // Invite + approval already succeeded — surface the email failure separately
       // so the admin can still hand the link over manually rather than losing the approval.
-      return jsonResponse({ approved: true, emailSent: false, inviteUrl, error: `Email failed to send: ${errText}` }, 200)
+      return jsonResponse({ approved: true, emailSent: false, inviteUrl, error: 'Email failed to send.' }, 200)
     }
 
     return jsonResponse({ approved: true, emailSent: true, inviteUrl })

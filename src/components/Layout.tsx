@@ -25,15 +25,17 @@ function NavItem({
   label,
   onNavigate,
   badge,
+  end,
 }: {
   to: string
   icon: ReactNode
   label: string
   onNavigate: () => void
   badge?: number
+  end?: boolean
 }) {
   return (
-    <NavLink to={to} end={to === '/'} onClick={onNavigate}>
+    <NavLink to={to} end={end ?? to === '/'} onClick={onNavigate}>
       {icon}
       <span className="nav-label">{label}</span>
       {badge != null && badge > 0 && <span className="nav-badge">{badge > 99 ? '99+' : badge}</span>}
@@ -103,6 +105,159 @@ const I = {
   assignments: <svg className="nav-ico" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /></svg>,
   events: <svg className="nav-ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
   settings: <svg className="nav-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.22.65.22 1 0 .35-.08.69-.22 1z" /></svg>,
+  activities: <svg className="nav-ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M13 7l-5 6h4l-1 5 5-6h-4z" /></svg>,
+  finance: <svg className="nav-ico" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21" /><path d="M4 10h16M5 6l7-3 7 3M6 10v8M12 10v8M18 10v8" /></svg>,
+}
+
+// ---------------------------------------------------------------------------
+// One declarative, capability-driven navigation config. Sections + items are
+// filtered against the current user's capabilities (NavCtx) so Admin, Trainer,
+// Team Leader and Member all read from the same source — no parallel arrays to
+// drift. `roles`/permission checks stay here, never in the rendered markup.
+// ---------------------------------------------------------------------------
+interface NavCtx {
+  isMember: boolean
+  isStaff: boolean
+  isAdmin: boolean // admin or trainer — office content managers
+  isManager: boolean // admin only — people / billing / office settings
+  canReviewGoals: boolean // admin or team_leader (permission-driven)
+}
+type BadgeKey = 'pendingMembers' | 'submissions'
+interface NavLeaf {
+  to: string
+  icon: ReactNode
+  label: string
+  end?: boolean
+  badge?: BadgeKey
+  show?: (c: NavCtx) => boolean
+}
+interface NavGroupDef {
+  group: true
+  icon: ReactNode
+  label: string
+  paths: string[]
+  show?: (c: NavCtx) => boolean
+  children: NavLeaf[]
+}
+type NavEntry = NavLeaf | NavGroupDef
+interface NavSection {
+  label: string
+  show?: (c: NavCtx) => boolean
+  items: NavEntry[]
+}
+
+const isGroup = (e: NavEntry): e is NavGroupDef => 'group' in e
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { to: '/', icon: I.dashboard, label: 'Dashboard', end: true },
+      { to: '/training', icon: I.learning, label: 'Learning Center' },
+      { to: '/business-path', icon: I.path, label: 'Business Path' },
+    ],
+  },
+  {
+    label: 'Business',
+    items: [
+      {
+        group: true,
+        icon: I.network,
+        label: 'My Network',
+        paths: ['/my-team', '/team', '/invites'],
+        show: (c) => c.isAdmin || c.isManager,
+        children: [
+          { to: '/my-team', icon: I.network, label: 'Overview', end: true },
+          { to: '/team', icon: I.teamPerf, label: 'Team', show: (c) => c.isManager },
+          { to: '/invites', icon: I.members, label: 'Members', badge: 'pendingMembers', show: (c) => c.isAdmin },
+        ],
+      },
+      { to: '/my-team', icon: I.network, label: 'My Network', show: (c) => !(c.isAdmin || c.isManager) },
+      { to: '/freelance', icon: I.freelance, label: 'Freelance' },
+      {
+        group: true,
+        icon: I.goals,
+        label: 'My Goals',
+        paths: ['/goals'],
+        show: (c) => c.canReviewGoals,
+        children: [
+          { to: '/goals', icon: I.goals, label: 'Overview', end: true },
+          { to: '/goals/review', icon: I.reports, label: 'Goal Reviews' },
+        ],
+      },
+      { to: '/goals', icon: I.goals, label: 'My Goals', show: (c) => !c.canReviewGoals },
+      { to: '/wallet', icon: I.wallet, label: 'My Wallet' },
+    ],
+  },
+  {
+    label: 'Management',
+    show: (c) => c.isStaff,
+    items: [
+      {
+        group: true,
+        icon: I.activities,
+        label: 'Activities',
+        paths: ['/quizzes', '/assignments', '/events', '/office/announcements'],
+        children: [
+          { to: '/quizzes', icon: I.exams, label: 'Quizzes', show: (c) => c.isAdmin },
+          { to: '/assignments', icon: I.assignments, label: 'Assignments', badge: 'submissions', show: (c) => c.isAdmin },
+          { to: '/events', icon: I.events, label: 'Events' },
+          { to: '/office/announcements', icon: I.megaphone, label: 'Announcements', show: (c) => c.isAdmin },
+        ],
+      },
+      { to: '/finance', icon: I.finance, label: 'Finance', show: (c) => c.isAdmin },
+    ],
+  },
+  {
+    label: 'Insights',
+    show: (c) => c.isStaff,
+    items: [
+      { to: '/reports', icon: I.reports, label: 'Reports & Insights' },
+      { to: '/leaderboard', icon: I.leaderboard, label: 'Leaderboard' },
+    ],
+  },
+  {
+    label: 'Community',
+    show: (c) => c.isMember,
+    items: [
+      { to: '/leaderboard', icon: I.leaderboard, label: 'Leaderboard' },
+      { to: '/updates', icon: I.megaphone, label: 'Office Updates' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/settings', icon: I.settings, label: 'Settings' },
+      { to: '/help', icon: I.help, label: 'Help & Support' },
+    ],
+  },
+]
+
+interface ResolvedSection {
+  label: string
+  items: NavEntry[]
+}
+
+function resolveNav(ctx: NavCtx): ResolvedSection[] {
+  const out: ResolvedSection[] = []
+  for (const section of NAV_SECTIONS) {
+    if (section.show && !section.show(ctx)) continue
+    const items: NavEntry[] = []
+    for (const entry of section.items) {
+      if (isGroup(entry)) {
+        if (entry.show && !entry.show(ctx)) continue
+        const children = entry.children.filter((k) => !k.show || k.show(ctx))
+        if (children.length === 0) continue
+        // A group that collapses to a single child reads cleaner as a flat item.
+        if (children.length === 1) items.push(children[0])
+        else items.push({ ...entry, children })
+      } else if (!entry.show || entry.show(ctx)) {
+        items.push(entry)
+      }
+    }
+    if (items.length > 0) out.push({ label: section.label, items })
+  }
+  return out
 }
 
 // Two cheap head-counts for the staff nav badges. Only runs for admins.
@@ -282,87 +437,47 @@ export default function Layout({ children }: { children: ReactNode }) {
     </Link>
   )
 
-  const memberNav = (
-    <>
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Overview</span>
-        <NavItem to="/" icon={I.dashboard} label="Dashboard" onNavigate={closeMenu} />
-        <NavItem to="/training" icon={I.learning} label="Learning Center" onNavigate={closeMenu} />
-      </div>
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">My Work</span>
-        <NavItem to="/business-path" icon={I.path} label="Business Path" onNavigate={closeMenu} />
-        <NavItem to="/goals" icon={I.goals} label="My Goals" onNavigate={closeMenu} />
-      </div>
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Build</span>
-        <NavItem to="/my-team" icon={I.network} label="My Network" onNavigate={closeMenu} />
-        <NavItem to="/freelance" icon={I.freelance} label="Freelance" onNavigate={closeMenu} />
-        <NavItem to="/leaderboard" icon={I.leaderboard} label="Leaderboard" onNavigate={closeMenu} />
-        <NavItem to="/updates" icon={I.megaphone} label="Office Updates" onNavigate={closeMenu} />
-        <NavItem to="/wallet" icon={I.wallet} label="My Wallet" onNavigate={closeMenu} />
-      </div>
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Account</span>
-        <NavItem to="/settings" icon={I.profile} label="Profile" onNavigate={closeMenu} />
-        <NavItem to="/help" icon={I.help} label="Help & Support" onNavigate={closeMenu} />
-      </div>
-    </>
-  )
+  const navCtx: NavCtx = {
+    isMember,
+    isStaff: !!currentMembership && !isMember,
+    isAdmin,
+    isManager: canManageBilling,
+    canReviewGoals,
+  }
+  const navSections = resolveNav(navCtx)
 
-  // Admin / Trainer / Team Leader — the office navigation.
-  const staffNav = (
-    <>
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Workspace</span>
-        <NavItem to="/" icon={I.dashboard} label="Dashboard" onNavigate={closeMenu} />
-        <NavItem to="/business-path" icon={I.path} label="Business Path" onNavigate={closeMenu} />
-        <NavItem to="/training" icon={I.learning} label="Learning Center" onNavigate={closeMenu} />
-      </div>
-
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Management</span>
-        {isAdmin && (
-          <NavGroup icon={I.assignments} label="Assessments" paths={['/quizzes', '/assignments']}>
-            <NavItem to="/quizzes" icon={I.exams} label="Quizzes" onNavigate={closeMenu} />
-            <NavItem to="/assignments" icon={I.assignments} label="Assignments" onNavigate={closeMenu} badge={badges.submissions} />
-          </NavGroup>
-        )}
-        <NavItem to="/events" icon={I.events} label="Events" onNavigate={closeMenu} />
-        {isAdmin && <NavItem to="/office/announcements" icon={I.megaphone} label="Announcements" onNavigate={closeMenu} />}
-        {canReviewGoals && <NavItem to="/goals/review" icon={I.goals} label="Goals Review" onNavigate={closeMenu} />}
-        {isAdmin && <NavItem to="/finance" icon={I.wallet} label="Finance" onNavigate={closeMenu} />}
-        <NavItem to="/reports" icon={I.reports} label="Reports & Insights" onNavigate={closeMenu} />
-      </div>
-
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Workplace</span>
-        <NavItem to="/leaderboard" icon={I.leaderboard} label="Leaderboard" onNavigate={closeMenu} />
-      </div>
-
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">Personal</span>
-        {isAdmin || canManageBilling ? (
-          <NavGroup icon={I.network} label="My Network" paths={['/my-team', '/team', '/invites']}>
-            <NavItem to="/my-team" icon={I.network} label="Overview" onNavigate={closeMenu} />
-            {canManageBilling && <NavItem to="/team" icon={I.teamPerf} label="Team" onNavigate={closeMenu} />}
-            {isAdmin && <NavItem to="/invites" icon={I.members} label="Members" onNavigate={closeMenu} badge={badges.pendingMembers} />}
+  const sidebarNav = navSections.map((section) => (
+    <div className="sidebar-sec" key={section.label}>
+      <span className="sidebar-sec-label">{section.label}</span>
+      {section.items.map((entry) =>
+        isGroup(entry) ? (
+          <NavGroup key={entry.label} icon={entry.icon} label={entry.label} paths={entry.paths}>
+            {entry.children.map((child) => (
+              <NavItem
+                key={child.to}
+                to={child.to}
+                icon={child.icon}
+                label={child.label}
+                end={child.end}
+                badge={child.badge ? badges[child.badge] : undefined}
+                onNavigate={closeMenu}
+              />
+            ))}
           </NavGroup>
         ) : (
-          <NavItem to="/my-team" icon={I.network} label="My Network" onNavigate={closeMenu} />
-        )}
-        <NavItem to="/freelance" icon={I.freelance} label="Freelance" onNavigate={closeMenu} />
-        <NavItem to="/goals" icon={I.goals} label="My Goals" onNavigate={closeMenu} />
-        <NavItem to="/wallet" icon={I.wallet} label="My Wallet" onNavigate={closeMenu} />
-      </div>
-
-      <div className="sidebar-sec">
-        <span className="sidebar-sec-label">System</span>
-        <NavItem to="/settings" icon={I.settings} label="Settings" onNavigate={closeMenu} />
-        <NavItem to="/help" icon={I.help} label="Help & Support" onNavigate={closeMenu} />
-      </div>
-    </>
-  )
+          <NavItem
+            key={`${section.label}:${entry.to}`}
+            to={entry.to}
+            icon={entry.icon}
+            label={entry.label}
+            end={entry.end}
+            badge={entry.badge ? badges[entry.badge] : undefined}
+            onNavigate={closeMenu}
+          />
+        ),
+      )}
+    </div>
+  ))
 
   return (
     <div className="app-shell">
@@ -379,7 +494,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {brand}
         </div>
 
-        <nav className="sidebar-nav">{isMember ? memberNav : staffNav}</nav>
+        <nav className="sidebar-nav">{sidebarNav}</nav>
 
         <div className="sidebar-bottom">
           <button

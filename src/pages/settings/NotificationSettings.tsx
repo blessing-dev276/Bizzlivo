@@ -10,6 +10,16 @@ const ROWS: { key: keyof NotificationPrefs; label: string; help: string }[] = [
   { key: 'announcements', label: 'Office announcements', help: 'Official updates from your office admins.' },
 ]
 
+// Email mirrors — a subset. Important account & security emails are
+// always sent and are not shown here.
+const EMAIL_ROWS: { key: keyof NotificationPrefs; label: string; help: string }[] = [
+  { key: 'email_goals', label: 'Goals & accountability', help: 'Goal reminders and review outcomes by email.' },
+  { key: 'email_finance', label: 'Finance updates', help: 'Withdrawal status changes by email.' },
+  { key: 'email_events', label: 'Event reminders', help: 'Upcoming event reminders by email.' },
+  { key: 'email_announcements', label: 'Office announcements', help: 'Announcements your admin chooses to email.' },
+  { key: 'email_learning', label: 'Learning updates', help: 'Occasional learning summaries by email.' },
+]
+
 export default function NotificationSettings() {
   const { profile } = useAuth()
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS)
@@ -43,6 +53,29 @@ export default function NotificationSettings() {
       </div>
       <div className="ns-list">
         {ROWS.map((r) => (
+          <label className="ns-row" key={r.key}>
+            <span>
+              <strong>{r.label}</strong>
+              <span className="ns-help">{r.help}</span>
+            </span>
+            <input type="checkbox" checked={prefs[r.key]} onChange={() => toggle(r.key)} />
+          </label>
+        ))}
+      </div>
+
+      <div className="page-head" style={{ marginTop: 28 }}>
+        <h2 style={{ margin: 0, fontSize: 16 }}>Email me about</h2>
+        <p>We only email things that are important or time-sensitive — never routine activity.</p>
+      </div>
+      <div className="ns-list">
+        <label className="ns-row" style={{ opacity: 0.7 }}>
+          <span>
+            <strong>Important account &amp; security emails</strong>
+            <span className="ns-help">Invites, security alerts, billing and support. Always on.</span>
+          </span>
+          <input type="checkbox" checked readOnly disabled />
+        </label>
+        {EMAIL_ROWS.map((r) => (
           <label className="ns-row" key={r.key}>
             <span>
               <strong>{r.label}</strong>

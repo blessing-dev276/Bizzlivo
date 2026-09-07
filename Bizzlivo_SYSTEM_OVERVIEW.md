@@ -192,9 +192,11 @@ Migrations `0034`–`0040` are all applied to the linked production database.
 
 ### 7.3 Navigation
 
-Members see grouped navigation: Dashboard, Onboarding/Training, **Business Path**, Goals, Reports, Network, Leaderboard, Wallet. (The old separate "Tasks" and "Rank Journey" items are folded into Business Path.)
+The sidebar is driven by **one declarative config** in `src/components/Layout.tsx` (`NAV_SECTIONS`), filtered by `resolveNav(navCtx)` against capability flags (`isMember`, `isStaff`, `isAdmin` = admin|trainer, `isManager` = admin, `canReviewGoals` = admin|team_leader). There are no per-role arrays — Admin, Trainer, Team Leader and Member all render from the same source, so nothing drifts. A collapsible group that filters down to a single visible child renders as a flat item.
 
-Staff see Dashboard, **Business Path**, Learning Center, Members, Team Performance, Leaderboard, Events, Reports, and Settings according to role. Communication, search, and the AI assistant still display as coming-soon or disabled controls.
+Sections: **Workspace** (Dashboard · Learning Center · Business Path) → **Business** (My Network — a group with Overview / Team `isManager` / Members `isAdmin` for staff, a flat link otherwise · Freelance · My Goals — a group with Overview / Goal Reviews when `canReviewGoals`, flat otherwise · My Wallet) → **Management** *(staff)* (Activities group: Quizzes `isAdmin` · Assignments `isAdmin` · Events *(all staff)* · Announcements `isAdmin`; plus Finance `isAdmin`) → **Insights** *(staff)* (Reports & Insights · Leaderboard) → **Community** *(member)* (Leaderboard · Office Updates) → **System** (Settings · Help & Support).
+
+"Activities" is a **navigation umbrella only** — quizzes / assignments / events / announcements keep their own routes (`/quizzes`, `/assignments`, `/events`, `/office/announcements`) and data models; there is no Activities landing page. Route structure is unchanged. Goal Reviews (`/goals/review`) is never shown to plain members. Hiding a link is not authorization — RLS remains the boundary.
 
 ## 8. Learning Center (v2 — `0038_learning_center.sql`)
 
