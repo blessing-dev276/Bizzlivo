@@ -30,6 +30,14 @@ export interface Organization {
   plan_tier: string
   status: string
   created_at: string
+  // Office profile (0060) — edited in Settings → Office.
+  tagline: string | null
+  about: string | null
+  support_email: string | null
+  website_url: string | null
+  address: string | null
+  country: string | null
+  timezone: string | null
   // Office finance settings (0043) — edited in Settings → Office.
   base_currency: string
   min_withdrawal_amount: number
