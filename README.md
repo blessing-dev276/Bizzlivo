@@ -33,7 +33,29 @@ supabase functions deploy generate-questions
 supabase functions deploy accept-invite
 supabase functions deploy paystack-webhook
 supabase functions deploy verify-paystack-transaction
+supabase functions deploy register-office-domain
 ```
+
+`register-office-domain` attaches each new office's subdomain
+(`<slug>.bizzlivo.com`) to the Vercel project so it gets its own TLS
+certificate — called best-effort from `completeOfficeSignup`. It needs a
+Vercel access token and the project id as function secrets (and the team
+id if the project sits under a team). Without them it's a safe no-op and
+offices fall back to the path-form login `/o/<slug>/login`:
+
+```bash
+supabase secrets set VERCEL_TOKEN=xxxxxxxx
+supabase secrets set VERCEL_PROJECT_ID=prj_KGCTBsFMTOWRqSga5C40dtztnkFj
+supabase secrets set VERCEL_TEAM_ID=team_Aiyxj68N4ctKayrChvU989bf
+# optional, defaults to bizzlivo.com:
+# supabase secrets set OFFICE_ROOT_DOMAIN=bizzlivo.com
+```
+
+A one-line `*` wildcard CNAME (`* → cname.vercel-dns.com`) must exist in
+DNS so the subdomains resolve; the per-office domain added by this
+function is what provisions the certificate and routing. Do **not** add
+`*.bizzlivo.com` as a domain in Vercel — a wildcard cert can't be issued
+while DNS is hosted off Vercel.
 
 `generate-questions` currently calls **Groq** (OpenAI-compatible chat
 completions, `llama-3.3-70b-versatile`) as an interim, cheaper provider —
