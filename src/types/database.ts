@@ -127,12 +127,21 @@ export interface Exam {
   created_at: string
 }
 
+export type RecurrenceEndType = 'never' | 'until' | 'count'
+export type MeetingProvider = 'none' | 'external' | 'google_meet'
+export type EventSyncStatus = 'not_synced' | 'syncing' | 'synced' | 'sync_failed'
+export type OccurrenceStatus = 'scheduled' | 'cancelled' | 'rescheduled' | 'completed'
+export type EventAudienceKind = 'all' | 'leadership' | 'team' | 'rank' | 'member'
+
 export interface HQEvent {
   id: string
   org_id: string
   title: string
   description: string | null
   category: EventCategory
+  // Present for one-time events. Recurring series leave these null and the
+  // instants live on event_occurrences — Phase B widens the readers, so the
+  // type still says `string` until then.
   start_at: string
   end_at: string
   venue_type: EventVenueType
@@ -141,6 +150,64 @@ export interface HQEvent {
   organizer_id: string | null
   status: EventStoredStatus
   created_by: string
+  created_at: string
+  updated_at: string
+  // ── recurring series (0066) ──
+  is_recurring: boolean
+  timezone: string | null
+  local_start_time: string | null // 'HH:MM' wall-clock in `timezone`
+  duration_minutes: number | null
+  recurrence_rule: string | null // RFC-5545 RRULE
+  series_start_date: string | null // 'YYYY-MM-DD'
+  recurrence_end_type: RecurrenceEndType
+  recurrence_until: string | null
+  recurrence_count: number | null
+  meeting_provider: MeetingProvider
+  meeting_url: string | null
+  reminder_minutes: number[]
+  email_reminders: boolean
+  google_calendar_id: string | null
+  google_event_id: string | null
+  google_conference_id: string | null
+  sync_status: EventSyncStatus
+  sync_error: string | null
+  synced_at: string | null
+}
+
+export interface EventOccurrence {
+  id: string
+  org_id: string
+  event_id: string
+  occurrence_date: string // 'YYYY-MM-DD'
+  start_at: string
+  end_at: string
+  status: OccurrenceStatus
+  is_override: boolean
+  override_title: string | null
+  meeting_url: string | null
+  google_event_id: string | null
+  reminders_sent: number[]
+  created_at: string
+  updated_at: string
+}
+
+export interface EventAttendanceRow {
+  occurrence_id: string
+  user_id: string
+  org_id: string
+  status: 'present' | 'absent' | 'excused'
+  method: 'admin' | 'self_checkin'
+  marked_by: string | null
+  marked_at: string
+}
+
+export interface EventAudienceRow {
+  id: string
+  org_id: string
+  event_id: string
+  occurrence_id: string | null
+  kind: EventAudienceKind
+  ref_id: string | null
   created_at: string
 }
 
