@@ -186,7 +186,8 @@ const NAV_SECTIONS: NavSection[] = [
         ],
       },
       { to: '/goals', icon: I.goals, label: 'My Goals', show: (c) => !c.canReviewGoals },
-      { to: '/wallet', icon: I.wallet, label: 'My Wallet' },
+      // Admins have no wallet of their own — they manage member earnings in Finance.
+      { to: '/wallet', icon: I.wallet, label: 'My Wallet', show: (c) => !c.isManager },
     ],
   },
   {

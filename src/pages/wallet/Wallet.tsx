@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { localDateString } from '../../lib/date'
 import { useAuth } from '../../lib/AuthContext'
@@ -45,6 +46,9 @@ export default function Wallet() {
   const { profile, currentMembership } = useAuth()
   const orgId = currentMembership?.organization.id
   const userId = profile?.id
+
+  // Admins have no wallet of their own — they work member earnings from Finance.
+  const isAdmin = currentMembership?.role === 'admin'
 
   const [balances, setBalances] = useState<FinanceMemberBalances | null>(null)
   const [orders, setOrders] = useState<FinanceOrder[]>([])
@@ -94,6 +98,8 @@ export default function Wallet() {
     const charges = await listCharges(order.id)
     setDetail({ order, charges })
   }
+
+  if (isAdmin) return <Navigate to="/finance" replace />
 
   if (loading) return <div className="page"><h1>My Wallet</h1><p className="empty-row">Loading…</p></div>
 
@@ -222,7 +228,7 @@ export default function Wallet() {
           {showPersonal ? '▾' : '▸'} Personal income log
         </button>
         {showPersonal && (
-          <PersonalIncome orgId={orgId!} userId={userId!} entries={personal} onChange={reload} />
+          <PersonalIncome orgId={orgId!} userId={userId!} entries={personal} onChange={reload} canEdit={currentMembership?.role === 'admin'} />
         )}
       </section>
 
@@ -501,8 +507,8 @@ function PayoutAccounts({
 }
 
 function PersonalIncome({
-  orgId, userId, entries, onChange,
-}: { orgId: string; userId: string; entries: IncomeDevelopmentIncomeEntry[]; onChange: () => void }) {
+  orgId, userId, entries, onChange, canEdit,
+}: { orgId: string; userId: string; entries: IncomeDevelopmentIncomeEntry[]; onChange: () => void; canEdit: boolean }) {
   const [amount, setAmount] = useState('')
   const [source, setSource] = useState('')
   const [earnedOn, setEarnedOn] = useState(localDateString())
@@ -525,34 +531,41 @@ function PersonalIncome({
   return (
     <div style={{ marginTop: 12 }}>
       <p className="md-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        This is for your own tracking only. It does <strong>not</strong> affect your Bizzlivo withdrawable balance.
+        {canEdit
+          ? <>This is for tracking only. It does <strong>not</strong> affect any withdrawable balance.</>
+          : <>Your office admin records these entries for you. They&apos;re for tracking only and do <strong>not</strong> affect your withdrawable balance.</>}
       </p>
-      <form onSubmit={add} className="upload-panel" style={{ marginBottom: 16 }}>
-        <div className="field-row">
-          <label style={{ maxWidth: 160 }}>Amount (₦)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-          <label>Source (optional)<input value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Logo design" /></label>
-          <label style={{ maxWidth: 170 }}>Date<input type="date" value={earnedOn} onChange={(e) => setEarnedOn(e.target.value)} /></label>
-        </div>
-        {err && <p className="form-error">{err}</p>}
-        <button type="submit" disabled={busy || !amount}>{busy ? 'Saving…' : 'Add entry'}</button>
-      </form>
+      {canEdit && (
+        <form onSubmit={add} className="upload-panel" style={{ marginBottom: 16 }}>
+          <div className="field-row">
+            <label style={{ maxWidth: 160 }}>Amount (₦)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+            <label>Source (optional)<input value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Logo design" /></label>
+            <label style={{ maxWidth: 170 }}>Date<input type="date" value={earnedOn} onChange={(e) => setEarnedOn(e.target.value)} /></label>
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button type="submit" disabled={busy || !amount}>{busy ? 'Saving…' : 'Add entry'}</button>
+        </form>
+      )}
+      {entries.length === 0 && !canEdit && <p className="empty-row">No income entries yet.</p>}
       {entries.length > 0 && (
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Date</th><th>Source</th><th>Amount</th><th /></tr></thead>
+            <thead><tr><th>Date</th><th>Source</th><th>Amount</th>{canEdit && <th />}</tr></thead>
             <tbody>
               {entries.map((e) => (
                 <tr key={e.id}>
                   <td className="cell-dim">{new Date(e.earned_on).toLocaleDateString()}</td>
                   <td>{e.source ?? '—'}</td>
                   <td>{money(Number(e.amount), 'NGN')}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button type="button" className="btn-ghost" onClick={async () => {
-                      if (!confirm('Delete this entry?')) return
-                      await supabase.from('income_development_income_entries').delete().eq('id', e.id)
-                      onChange()
-                    }}>Delete</button>
-                  </td>
+                  {canEdit && (
+                    <td style={{ textAlign: 'right' }}>
+                      <button type="button" className="btn-ghost" onClick={async () => {
+                        if (!confirm('Delete this entry?')) return
+                        await supabase.from('income_development_income_entries').delete().eq('id', e.id)
+                        onChange()
+                      }}>Delete</button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { loadMember360, member360Attention, type Member360 } from '../../lib/officeExtras'
-import { moneyList } from '../../lib/finance'
-import type { MemberMonthlyGoal } from '../../types/database'
+import { money, moneyList } from '../../lib/finance'
+import { localDateString } from '../../lib/date'
+import type { IncomeDevelopmentIncomeEntry, MemberMonthlyGoal } from '../../types/database'
 import { STATUS_META as GOAL_STATUS_META, goalPercent } from '../../lib/goals'
 
-type Tab = 'overview' | 'business-path' | 'goals'
+type Tab = 'overview' | 'business-path' | 'goals' | 'income'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'business-path', label: 'Business Path' },
   { id: 'goals', label: 'Goals' },
+  { id: 'income', label: 'Income' },
 ]
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '—')
@@ -115,6 +117,8 @@ export default function MemberProfile360() {
       )}
 
       {tab === 'goals' && <GoalsTab orgId={orgId} userId={userId} />}
+
+      {tab === 'income' && <IncomeTab orgId={orgId} userId={userId} canEdit={role === 'admin'} />}
     </div>
   )
 }
@@ -153,6 +157,88 @@ function GoalsTab({ orgId, userId }: { orgId: string; userId: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function IncomeTab({ orgId, userId, canEdit }: { orgId: string; userId: string; canEdit: boolean }) {
+  const [rows, setRows] = useState<IncomeDevelopmentIncomeEntry[] | null>(null)
+  const [amount, setAmount] = useState('')
+  const [source, setSource] = useState('')
+  const [earnedOn, setEarnedOn] = useState(localDateString())
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    supabase
+      .from('income_development_income_entries')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .order('earned_on', { ascending: false })
+      .then(({ data }) => setRows((data as IncomeDevelopmentIncomeEntry[]) ?? []))
+  }, [orgId, userId])
+  useEffect(load, [load])
+
+  async function add(e: FormEvent) {
+    e.preventDefault()
+    const value = Number(amount)
+    if (!(value > 0)) { setErr('Enter an amount greater than zero.'); return }
+    setBusy(true); setErr(null)
+    const { error } = await supabase.from('income_development_income_entries').insert({
+      org_id: orgId, user_id: userId, amount: value, source: source.trim() || null, earned_on: earnedOn,
+    })
+    setBusy(false)
+    if (error) { setErr(error.message); return }
+    setAmount(''); setSource(''); load()
+  }
+
+  return (
+    <div>
+      <p className="rp-note">
+        Self-reported personal income, recorded by an office admin on the member's behalf. Kept
+        separate from verified, withdrawable earnings.
+      </p>
+      {canEdit && (
+        <form onSubmit={add} className="upload-panel" style={{ marginBottom: 16 }}>
+          <div className="field-row">
+            <label style={{ maxWidth: 160 }}>Amount (₦)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+            <label>Source (optional)<input value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Logo design" /></label>
+            <label style={{ maxWidth: 170 }}>Date<input type="date" value={earnedOn} onChange={(e) => setEarnedOn(e.target.value)} /></label>
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <button type="submit" disabled={busy || !amount}>{busy ? 'Saving…' : 'Add entry'}</button>
+        </form>
+      )}
+      {!rows ? (
+        <p className="empty-row">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="empty-row">No income entries yet.</p>
+      ) : (
+        <div className="rp-table-wrap">
+          <table className="rp-table">
+            <thead><tr><th>Date</th><th>Source</th><th>Amount</th>{canEdit && <th />}</tr></thead>
+            <tbody>
+              {rows.map((e) => (
+                <tr key={e.id}>
+                  <td className="rp-dim">{new Date(e.earned_on).toLocaleDateString()}</td>
+                  <td>{e.source ?? '—'}</td>
+                  <td>{money(Number(e.amount), 'NGN')}</td>
+                  {canEdit && (
+                    <td style={{ textAlign: 'right' }}>
+                      <button type="button" className="btn-ghost" onClick={async () => {
+                        if (!confirm('Delete this entry?')) return
+                        await supabase.from('income_development_income_entries').delete().eq('id', e.id)
+                        load()
+                      }}>Delete</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
