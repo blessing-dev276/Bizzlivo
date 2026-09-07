@@ -55,9 +55,54 @@ const STEPS = [
 ]
 
 const PLANS = [
-  { name: 'Free', price: '₦0', per: '', note: 'Pilot a single office', features: ['1 branded office', 'Core learning & onboarding', 'Up to 5 members', '1 published assessment'], cta: 'Start free' },
-  { name: 'Growth', price: '₦5,000', per: '/mo', note: 'Running a real team', features: ['Everything in Free', 'Up to 20 members', 'Business Path & ranks', 'AI question generation', 'Reports & insights'], cta: 'Start Growth', popular: true },
-  { name: 'Business', price: '₦12,000', per: '/mo', note: 'Multi-team operations', features: ['Everything in Growth', 'Up to 50 members', 'Wallet & payouts', 'Custom branding', 'Priority support'], cta: 'Choose Business' },
+  {
+    name: 'Free',
+    price: '₦0',
+    per: '',
+    note: 'For small offices getting started.',
+    features: [
+      'Up to 5 members',
+      '1 admin seat',
+      'Dashboard, Learning Center & Business Path',
+      'Goals, My Network, Finance & Wallet',
+      'Events & assessments',
+      'Basic reports & insights',
+    ],
+    cta: 'Start free',
+  },
+  {
+    name: 'Growth',
+    price: '₦15,000',
+    per: '/mo',
+    note: 'For growing offices building consistent teams.',
+    features: [
+      'Up to 25 members',
+      '2 admin seats',
+      'Everything in Free',
+      'Full reports & insights',
+      'AI question generation',
+      'No “Powered by Bizzlivo” badge',
+      'Priority support',
+    ],
+    cta: 'Start Growth',
+    popular: true,
+  },
+  {
+    name: 'Business',
+    price: '₦35,000',
+    per: '/mo',
+    note: 'For established offices managing larger teams.',
+    features: [
+      'Up to 100 members',
+      '5 admin seats',
+      'Everything in Growth',
+      'Advanced reports — custom ranges + CSV export',
+      'Wallet & payouts',
+      'Custom logo & brand colour',
+      'Priority support',
+    ],
+    cta: 'Choose Business',
+  },
 ]
 
 const FAQS = [
@@ -205,7 +250,7 @@ export default function Landing() {
           <div className="lp-section-head" data-reveal>
             <span className="lp-kicker">Pricing</span>
             <h2>Start free. Upgrade when you grow.</h2>
-            <p>Every plan includes branded offices, secure isolation and unlimited learning content.</p>
+            <p>Every plan includes branded offices, secure isolation and unlimited learning content. Paid plans are billed monthly — pay yearly and get about two months free.</p>
           </div>
           <div className="lp-plans">
             {PLANS.map((p) => (
