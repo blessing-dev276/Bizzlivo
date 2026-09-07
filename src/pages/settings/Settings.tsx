@@ -5,6 +5,7 @@ import ProfileSettings from './ProfileSettings'
 import OfficeSettings from './OfficeSettings'
 import NotificationSettings from './NotificationSettings'
 import SecuritySettings from './SecuritySettings'
+import MembershipDanger from './MembershipDanger'
 
 // Profile + Notifications are for everyone; Office and Billing are admin-only.
 type Section = 'profile' | 'notifications' | 'security' | 'office' | 'billing'
@@ -49,6 +50,8 @@ export default function Settings() {
       {section === 'security' && <SecuritySettings />}
       {section === 'office' && isAdmin && <OfficeSettings />}
       {section === 'billing' && isAdmin && <Billing />}
+
+      {(section === 'profile' || section === 'office') && <MembershipDanger />}
     </div>
   )
 }

@@ -187,14 +187,14 @@ export async function loadRankItems(orgId: string, rankId: string): Promise<Busi
 // Learning areas unlock as the member climbs the Business Path. Gated by the
 // current rank's position (order_index) rather than its slug, so it keeps
 // working when an org renames or reorders its ranks:
-//   position 0 (Prospect)  → Onboarding only
-//   position 1 (Newbie)    → everything except Income Development
-//   position 2+ (Qualified…) → all areas
+//   position 0 (Prospect)  → Onboarding, Network Marketing, Personal Development
+//   position 1 (Newbie)    → + Freelancing
+//   position 2+ (Qualified…) → + Income Development (all areas)
 const AREA_UNLOCK_POSITION: Record<LearningArea, number> = {
   onboarding: 0,
-  network_marketing: 1,
+  network_marketing: 0,
+  personal_development: 0,
   freelancing: 1,
-  personal_development: 1,
   income_development: 2,
 }
 

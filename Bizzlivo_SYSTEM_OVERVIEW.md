@@ -514,6 +514,16 @@ A full control plane for running Bizzlivo, **completely separate** from any orga
 
 **New tables (0054):** `plan_overrides` (org_id PK, original_plan, override_plan, reason, created_by, expires_at), `platform_settings` (single row — signup_enabled / maintenance_mode / default_free_plan / support_email; only the wired toggles). Email logging is provided by `0053_email` (`email_outbox` / `email_log`), not duplicated here.
 
+### Office lifecycle — leave / delete / restore (`0058_office_lifecycle.sql`)
+
+`organizations.status` now also takes `'deleted'` (soft — no rows are removed) with `deleted_at` / `deleted_by` / `deleted_reason` / `suspended_reason` on the row for the record.
+
+- **`member_leave_office(org)`** — `security definer`, `authenticated`. Sets the caller's own `memberships.status='left'`; refuses if they are the only active `admin` (audits `member.left`). Surfaced in **Settings → Danger zone** ("Leave office") for every role.
+- **`delete_office(org, reason)`** — `security definer`, `authenticated`, `has_org_role(org, {admin})`. Flips `status='deleted'` + records `deleted_*`, audits `org.deleted`. Surfaced in **Settings → Danger zone** ("Delete office", admin only, type-the-name + reason confirm).
+- **`platform_set_org_status(org, status, reason)`** — extended to accept `'deleted'` and to clear `deleted_*` / `suspended_reason` whenever an org is set back to `'active'`. Restoring a deleted office writes **only** an `audit_log` row (office admins can't read `platform.*` audit) and sends **no notification** — the revival is invisible to the office. `platform_orgs` gains a `deleted` filter; `/platform` OrgDetail shows a **"Restore deleted office"** action.
+- **App guard:** `ProtectedRoute` blocks the workspace when `currentMembership.organization.status !== 'active'` with an "office unavailable / closed" screen (suspended vs deleted copy); `/platform/*` is outside `<Protected>` and unaffected. A member on other active offices is pointed at the office switcher.
+- Business Path learning gate: `AREA_UNLOCK_POSITION` now unlocks Network Marketing + Personal Development at Prospect (pos 0), Freelancing at Newbie (pos 1), Income Development at Qualified (pos 2).
+
 **Limits / follow-ups:** no member impersonation (deliberate); `platform_settings` toggles are stored + audited but not yet enforced in signup / the app shell; Plans view is read-only (`plan_limits` stays the pricing source of truth, edited via migration); ARR is hidden until there is real subscription data (prod currently has 0 subscriptions → MRR ₦0).
 
 ### Help & Support (`/help`, `0052`)

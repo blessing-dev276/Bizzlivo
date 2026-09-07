@@ -413,7 +413,7 @@ function Orgs() {
     <>
       <div className="pl-head"><h1>Organizations</h1><p>Every office using Bizzlivo.</p></div>
       <div className="pl-filters">
-        {['all', 'free', 'growth', 'business', 'active', 'suspended', 'past_due'].map((f) => (
+        {['all', 'free', 'growth', 'business', 'active', 'suspended', 'deleted', 'past_due'].map((f) => (
           <button key={f} className={`chip ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>{f.replace('_', ' ')}</button>
         ))}
         <input className="net-search" placeholder="Search name / owner / email…" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260 }} />
@@ -495,9 +495,18 @@ function OrgDetail() {
           </div>
           <Panel title="Actions">
             <div className="pl-actions">
-              {status === 'active'
-                ? <ReasonAction label="Suspend organization" danger busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'suspended', r), 'Organization suspended.')} />
-                : <ReasonAction label="Reactivate organization" busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'active', r), 'Organization reactivated.')} />}
+              {status === 'active' && (
+                <ReasonAction label="Suspend organization" danger busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'suspended', r), 'Organization suspended.')} />
+              )}
+              {status === 'suspended' && (
+                <ReasonAction label="Reactivate organization" busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'active', r), 'Organization reactivated.')} />
+              )}
+              {status === 'deleted' && (
+                <ReasonAction label="Restore deleted office" busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'active', r), 'Office restored — no notice sent to the office.')} />
+              )}
+              {status !== 'deleted' && status !== 'active' && status !== 'suspended' && (
+                <ReasonAction label="Reactivate organization" busy={busy} onSubmit={(r) => act(() => setOrgStatus(orgId!, 'active', r), 'Organization reactivated.')} />
+              )}
               <PlanOverrideAction orgId={orgId!} current={String(org.plan_tier)} hasOverride={!!override} busy={busy} onDone={reload} setMsg={setMsg} />
               {sub && <ReasonAction label="Extend trial 14 days" busy={busy} onSubmit={(r) => act(() => extendTrial(orgId!, 14, r), 'Trial extended.')} />}
             </div>
