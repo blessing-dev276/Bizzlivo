@@ -35,6 +35,46 @@ supabase functions deploy paystack-webhook
 supabase functions deploy verify-paystack-transaction
 ```
 
+### Events: recurring meetings, reminders, Google Calendar/Meet
+
+The Events system (series + occurrences + attendance + reminders + optional
+Google sync) is documented in `Bizzlivo_SYSTEM_OVERVIEW.md` §13.
+
+**Reminders cron (`events-tick`)** — needs `pg_cron` + `pg_net` (enabled on
+the project) and two Vault secrets created once:
+
+```sql
+select vault.create_secret('<SUPABASE_SERVICE_ROLE_KEY>', 'events_tick_service_key');
+select vault.create_secret('<EMAIL_WORKER_SECRET>',        'events_tick_worker_secret');
+```
+
+```bash
+supabase functions deploy events-tick --no-verify-jwt
+```
+
+Migration `0074_events_tick.sql` schedules it every 10 minutes.
+
+**Google Calendar / Meet (optional — inert until configured).** Create a
+Google Cloud project, enable the Calendar API, configure the OAuth consent
+screen (scope `calendar.events`), create a **Web** OAuth client with
+redirect URI
+`https://<project-ref>.supabase.co/functions/v1/google-oauth-callback`,
+then:
+
+```bash
+supabase secrets set GOOGLE_OAUTH_CLIENT_ID=...
+supabase secrets set GOOGLE_OAUTH_CLIENT_SECRET=...
+supabase secrets set INTEGRATION_ENC_KEY=$(openssl rand -base64 32)   # 32 bytes, base64
+supabase functions deploy google-oauth-start
+supabase functions deploy google-oauth-callback --no-verify-jwt
+supabase functions deploy google-disconnect
+supabase functions deploy google-sync-event
+```
+
+Without those secrets every Google path is a safe no-op — external-link,
+physical, one-time and recurring events all work with Google disconnected.
+Admins connect the office account at **Settings → Integrations**.
+
 ### Branded office subdomains (`<slug>.bizzlivo.com`)
 
 One **wildcard domain** on the Vercel project handles every office — no

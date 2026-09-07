@@ -165,7 +165,7 @@ Authenticated routes:
 | Member development | `/goals`, `/wallet` |
 | People and teams | `/invites`, `/invites/assign`, `/team-performance`, `/team-performance/:teamId`, `/my-team` |
 | CBT member area | `/cbt`, `/cbt/:assignmentId/take`, `/cbt/attempts/:attemptId/result` |
-| Events | `/events`, `/events/new`, `/events/:eventId`, `/events/:eventId/edit` |
+| Events | `/events`, `/events/new`, `/events/:eventId`, `/events/:eventId/edit`, `/events/:eventId/:date` (one occurrence) |
 | Reporting | `/reports`, `/reports/training`, `/leaderboard` |
 | Office management | `/settings`, `/billing` |
 
@@ -392,11 +392,49 @@ The freelancing counterpart of My Network — the member-facing CRM for the free
 
 **Deferred (later phases of the connected-OS work):** Action Center, Notification Center + preferences, Office Announcements, Admin Member 360, Office setup wizard, Office Activity/Pulse, Global Search (Cmd+K), Bizzlivo Super Admin, Help & Support, and the admin-side Finance↔project linking UI.
 
-## 13. Events
+## 13. Events — recurring meeting & training system
 
-Staff create, edit, schedule, cancel, and delete office events. Events have category, start/end time, physical or online venue data, organizer, and draft/scheduled/cancelled state.
+Recurring office operations (daily training, weekly leadership meeting, …) built as a proper **series / occurrence** model. An admin creates a series once; Bizzlivo derives every session, reminder, attendance record and Google sync from it. Migrations `0016`/`0018` (original one-time events), then `0068` (series schema), `0071` (occurrence RPCs), `0074` (reminders cron), `0075` (Google integration), `0076` (leaderboard + report RPC).
 
-Users browse events in calendar/list views and join or leave attendance. Staff can also manage attendees. Main tables are `events` and `event_attendees`.
+### Data model
+
+- **`events`** — now the SERIES / definition row. Keeps `category`, `venue_type` (`physical`/`online`), `venue_location`, `organizer_id`, `status` (`draft`/`scheduled`/`cancelled`), plus: `is_recurring`, `recurrence_rule` (RFC-5545 **RRULE** string), `timezone` (IANA, defaults from `organizations.timezone`), `local_start_time` (`HH:MM` wall clock), `duration_minutes`, `series_start_date`, `recurrence_end_type` (`never`/`until`/`count`) + `recurrence_until`/`recurrence_count`, `meeting_provider` (`none`/`external`/`google_meet`), `meeting_url`, `reminder_minutes int[]` (default `{30}`), `email_reminders bool` (default false), Google sync columns (`google_calendar_id`/`google_event_id`/`google_conference_id`/`sync_status`/`sync_error`/`synced_at`), `updated_at`. One-time events keep `start_at`/`end_at`; recurring leave them null.
+- **`event_occurrences`** — **lazily materialized**. A row exists only when a specific date needs state: attendance taken, a reminder dispatched, or an admin cancelled / rescheduled / overrode that date. Columns: `occurrence_date`, resolved `start_at`/`end_at`, `status` (`scheduled`/`cancelled`/`rescheduled`/`completed`), `is_override`, `override_title`, `meeting_url`, `google_event_id`, `reminders_sent int[]`. Unmodified future dates are **computed from the RRULE, never stored**.
+- **`event_attendance`** — verified presence per `(occurrence_id, user_id)`: `status` (`present`/`absent`/`excused`), `method` (`admin`/`self_checkin`), `marked_by`, `marked_at`. Distinct from the legacy `event_attendees` RSVP/"following" table, which is kept as-is.
+- **`event_audiences`** — `(event_id, occurrence_id?, kind, ref_id)` where `kind` ∈ `all` / `leadership` / `team` (group id) / `rank` (`business_path_ranks.id`) / `member` (user id). No audience rows = whole org (back-compat). `event_is_visible_to(event, user)` and `event_audience_user_ids(event)` resolve it.
+- **`organization_integrations`** — per-office Google connection (see below).
+
+### Recurrence engine
+
+`src/lib/recurrence.ts` (frontend) + `supabase/functions/_shared/recurrence.ts` (Deno) share the logic, built on `rrule`. Six UI presets — Daily, Weekdays (`FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR`), Weekly, Selected days, Monthly, Custom interval — map to/from RRULE strings; `describeRRule` renders the human summary. **Timezone**: rrule expands in "floating" time, then each wall-clock datetime is resolved to a real UTC instant using the series' IANA offset for that date (DST-correct). Never the browser's timezone. `src/lib/eventSeries.ts` (`resolveOccurrences` / `nextUpcoming`) merges computed dates with materialized override rows into one sorted list; `src/lib/eventsData.ts` is the shared fetch+resolve loader used by the Events page and the dashboard.
+
+### UX
+
+- **`/events`** — NEXT EVENT / LIVE NOW hero with a Join button (online + within `[start−15min, end]`), TODAY, UPCOMING grouped by day, and an admin RECURRING SERIES list. One row per real occurrence — no duplicate rows.
+- **`/events/new`, `/events/:eventId/edit`** — one-time vs recurring, the six presets + day-picker + custom interval, start date / wall time / duration / timezone, end options with a live preview; Physical or Online → External link or Google Meet; reminder-window checkboxes (default one, 30 min; email off by default); audience picker.
+- **`/events/:eventId`** — series overview: recurrence summary, next 20 computed sessions with override state, edit / cancel-series / delete, and (for `google_meet`) the sync state + a Sync/Re-sync button. One-time events redirect to their single occurrence page.
+- **`/events/:eventId/:date`** — one session: Join, member self **check-in** (RPC-enforced `−15/+30 min` window; opening the page never counts), admin attendance grid (present/absent, self check-ins flagged), **cancel this session**, **reschedule this date** — all scoped to the date; the RRULE is never mutated.
+- Dashboard surfaces today's / the next occurrence with a Join button, resolved through the same engine.
+
+### Occurrence RPCs (`0071`)
+
+`materialize_occurrence(event, date, start, end)` (admin/trainer) upserts the row from frontend-computed instants — **Postgres never expands an RRULE**. `check_in_by_date(event, date, start, end)` (any eligible member) materializes then applies the window check. `set_occurrence_state(occurrence, status, start?, end?, title?)` cancels / reschedules / retitles one date.
+
+### Reminders — `events-tick` (`0074`)
+
+`pg_cron` (`*/10 * * * *`) → `net.http_post` → the `events-tick` edge function, authenticated by `x-worker-secret == EMAIL_WORKER_SECRET` (Bearer + secret held in Supabase **Vault**: `events_tick_service_key`, `events_tick_worker_secret` — created once by an operator, never committed). Each pass: materialize occurrences inside the reminder horizon (nothing further out), and for each upcoming occurrence + each `reminder_minutes` window not in `reminders_sent`, insert in-app `notifications` (`event_reminder`) for the resolved audience and — only when the series set `email_reminders` — one `enqueue_email` per recipient with dedupe key `evt:<occurrence>:<user>:<minutes>`; then append the window to `reminders_sent`. Cancelled occurrences are skipped. Finished occurrences flip to `completed`. **A daily meeting sends one reminder, not four.**
+
+### Google Calendar / Meet — one-way sync (`0075`), **inert until configured**
+
+Per-office. `organization_integrations` (service-role only; admins read status via `get_org_integration()`) holds the OAuth **refresh token encrypted in the edge runtime** (AES-GCM, `INTEGRATION_ENC_KEY`) — Postgres never sees the key or plaintext. `oauth_states` is a 10-minute CSRF token store. Edge functions: `google-oauth-start` (admin only, minimal scope `calendar.events` + `openid email`, `access_type=offline&prompt=consent`), `google-oauth-callback` (**deploy with `verify_jwt = false`** — Google calls it directly; validates state, server-side code exchange, encrypt + upsert, redirect to `/settings/integrations?google=…`), `google-disconnect` (revoke + clear; events and history kept), `google-sync-event` (loads integration → refreshes access token → **one** Google recurring event with `recurrence: ['RRULE:…']` + `conferenceData.createRequest` for Meet; saves `google_event_id` + real `hangoutLink` → `meeting_url`; `sync_status` = `syncing`→`synced`/`sync_failed` with a Retry; a failed token refresh sets the integration to `attention`). Settings → Integrations (`/settings/integrations`, admin) is the connect/disconnect UI. **Without `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `INTEGRATION_ENC_KEY` the whole thing is a no-op** — external-link, physical, one-time and recurring events all work with Google disconnected. Meet attendance is **not** auto-imported (Google doesn't reliably expose it for this use case); architected so it can be added later.
+
+### Leaderboard & reports (`0076`)
+
+`event_attendance.status='present'` is the first trustworthy attendance signal, so the leaderboard's **Events** category is switched on: a forward-only, idempotent trigger awards `event.attended` points keyed by occurrence (scores at most once per member per session). RSVP / views / Join-clicks never score. `get_event_report(org, from, to)` returns sessions **held** (past, non-cancelled occurrences only) + attendance/present/distinct-attendee counts per series — the Reports "Events" tab UI is a thin follow-up.
+
+### RLS
+
+All new tables are `org_id`-scoped. Occurrences: members read those whose series audience includes them (admins/trainers read all); admins/trainers manage. Attendance: org members read, admins/trainers write, members insert only via `check_in_*`. `organization_integrations` + `oauth_states`: service-role only; admins read integration status through a `SECURITY DEFINER` function. Manage policy on `events` fixed from the stale `owner`/`instructor` names to `admin`/`trainer`.
 
 ## 14. Goals, reports, ranks, wallet, and leaderboard
 
@@ -717,8 +755,13 @@ New offices attempt a 14-day Growth trial (`start_trial`). Status is reconciled 
 | `paystack-webhook` | Paystack signature | Record verified payment events and update subscription |
 | `verify-paystack-transaction` | Authenticated admin | Verify checkout result and synchronize billing state |
 | `join-by-referral` | Anonymous preview; authenticated join | Resolve a member's `profiles.referral_code`, add the caller to that office as an active member, and record the code's owner as their sponsor (`profiles.sponsor_member_id`) |
+| `events-tick` | `x-worker-secret == EMAIL_WORKER_SECRET` (called by `pg_cron`) | Materialize occurrences in the reminder horizon, dispatch due in-app / opt-in email reminders (deduped), flip finished occurrences to `completed` |
+| `google-oauth-start` | Authenticated admin | Create the CSRF `oauth_states` row, return the Google consent URL. No-op without `GOOGLE_OAUTH_CLIENT_ID` |
+| `google-oauth-callback` | **No JWT** (Google redirects here — deploy `verify_jwt = false`) | Validate state, exchange code server-side, AES-GCM encrypt the refresh token, upsert `organization_integrations`, redirect to Settings → Integrations |
+| `google-disconnect` | Authenticated admin | Revoke the token at Google, clear the stored credential; events + history untouched |
+| `google-sync-event` | Authenticated admin/trainer | One-way Bizzlivo→Google: create/patch one recurring calendar event (RRULE) + a Meet conference; persist ids + `hangoutLink`; set `sync_status` |
 
-Some functions intentionally accept requests without a JWT because the user has not authenticated yet. Function deployment must preserve the expected Supabase JWT-verification setting; there is currently no version-controlled `supabase/config.toml` defining it.
+Some functions intentionally accept requests without a JWT because the user has not authenticated yet (public exam/invite flows) or because an external service calls them directly (`google-oauth-callback`). Function deployment must preserve the expected Supabase JWT-verification setting; there is currently no version-controlled `supabase/config.toml` defining it — `google-oauth-callback` and `events-tick` in particular must have `verify_jwt` off.
 
 ## 18. Database domain map
 
