@@ -100,6 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     for (const m of (membershipData as unknown as MembershipWithOrg[]) ?? []) {
       supabase.rpc('sync_subscription_status', { target_org_id: m.org_id }).then(() => {})
     }
+
+    // Also lazily nudge the transactional-email queue (no scheduler yet).
+    // Small batch, best-effort — any queued mail gets a delivery attempt
+    // on the next visit by any member.
+    if ((membershipData as unknown[] | null)?.length) {
+      supabase.functions.invoke('process-email-outbox', { body: { limit: 10 } }).catch(() => {})
+    }
   }
 
   async function refresh() {

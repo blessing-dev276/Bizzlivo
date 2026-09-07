@@ -72,6 +72,11 @@ Server-only secrets belong in Supabase Edge Function secrets and must never be a
 GROQ_API_KEY
 PAYSTACK_SECRET_KEY
 RESEND_API_KEY
+RESEND_FROM_EMAIL      # notifications@bizzlivo.com (verified Resend domain)
+RESEND_FROM_NAME       # Bizzlivo
+APP_URL                # https://bizzlivo.com — used to build links in server-sent email
+SUPPORT_EMAIL          # support@bizzlivo.com — Reply-To + staff support alerts
+EMAIL_WORKER_SECRET    # optional shared secret for an external cron to drain the email outbox
 ```
 
 Supabase automatically injects its URL, anonymous key, and service-role key into deployed Edge Functions.
@@ -492,9 +497,24 @@ The system has general leaderboard views based on attempts/performance. The newe
 
 `search_office(p_org, q, limit)` — one `security definer` RPC, `is_org_member` gated, `UNION ALL` of `ILIKE` over members (staff only), classes, events, ranks, and the caller's own goals / network prospects / freelance prospects·clients·projects; returns `[{kind, id, label, sublabel, route}]`. `src/components/CommandK.tsx` is a ⌘/Ctrl-K modal (debounced 220ms) mounted in `Layout`; the topbar search box opens it. Below results it lists role-gated quick actions (add prospect, create goal, create event, record finance order, invite member, new announcement).
 
-### Bizzlivo Super Admin (`/platform`, `0051` + `0003`)
+### Bizzlivo Platform Operations Center (`/platform`, `0003` + `0054_platform_ops.sql`)
 
-Entirely separate from office roles. `platform_admins` + `is_platform_admin()` (0003) gate a standalone `/platform/*` shell (`src/pages/platform/Platform.tsx`) rendered **outside** `<Protected>` — it does its own auth/platform-admin check. Data: `platform_overview()` (0051 — org counts, users, active-7d from `activity_log`, MRR from `subscriptions × plan_limits`, monthly AI usage, newest orgs) plus the existing 0003 RPCs `admin_list_offices()` / `admin_get_office_detail(org)` / `admin_set_office_status(org, status)` / `admin_set_plan_tier(org, plan)` (all `is_platform_admin`-guarded, and status/plan changes write `audit_log`). Pages: Overview, Organizations list, Org detail (suspend / reactivate / plan override). Office admins can never reach these — the RPCs return empty / raise for non-platform-admins and the route redirects.
+A full control plane for running Bizzlivo, **completely separate** from any organization role.
+
+**Roles.** `platform_admins(id → profiles, role text — super_admin / support / billing_admin, username, last_login_at, must_change_password)`. `is_platform_admin()` = any row; `is_platform_super_admin()` = `role='super_admin'` (0054). An `admin` on an office has **no** platform access.
+
+**Auth & login.** Dedicated `/platform/login` (`PlatformLogin`, not the member login). Supabase Auth is email-only, so username sign-in goes: anon-callable `platform_username_email(u)` → resolves the backing auth email → `signInWithPassword` → verify `is_platform_admin()` → `platform_record_login()` stamps `last_login_at` + writes an `audit_log` `platform.login` row. `must_change_password` forces `/platform/security` first. `PlatformShell` guards every other `/platform/*` route (rendered **outside** `<Protected>` — it does its own check) and redirects non-admins to `/platform/login`.
+
+**Initial account (bootstrap).** `admin-bizzlivo` was created out-of-band via the Supabase Auth admin API (no secret in the repo): an `auth.users` row (`admin-bizzlivo@platform.bizzlivo.app`), a `profiles` row, and a `platform_admins` row (`role='super_admin'`, `username='admin-bizzlivo'`, `must_change_password=true`). Password is hashed by Supabase Auth; nothing is stored plaintext or committed.
+
+**Shell.** Left sidebar (Overview · Organizations/Subscriptions · Users/AI Usage/Email/Support/Audit · Plans/Settings · Security), topbar with a debounced global search (orgs + users), account chip, Logout, Exit to app.
+
+**Privileged RPCs (0054)** — all `security definer`, `is_platform_admin()` (writes that mutate plans/settings need `is_platform_super_admin()`), fixed `search_path`, take no client identity:
+`platform_overview()` (KPIs, plan mix, 12-month org/user growth, needs-attention: past-due subs / email failures / stale support / orgs at AI limit / orgs over member limit, recent orgs + activity), `platform_orgs(filter, q)`, `platform_org_detail(org)` (tabs: overview/members/subscription/usage/activity/support/audit), `platform_users(q)`, `platform_subscriptions(filter)`, `platform_ai_usage()`, `platform_audit(q)`, `platform_support()` (read-only cross-org; replies still handled by the office admin), `platform_email_stats()` (reads `email_log`/`email_outbox` from `0053_email`). Writes: `platform_set_org_status(org, status, reason)`, `platform_set_plan_override(org, plan, reason, expires)` + `platform_clear_plan_override(org)` (writes `plan_overrides`, flips `organizations.plan_tier`, restores on clear), `platform_extend_trial(org, days, reason)`, `platform_settings_update(...)`. **Every write requires a reason and writes an `audit_log` row** (`platform.*` actions with `before`/`after`). `audit_log.org_id` was made nullable for platform-scoped events.
+
+**New tables (0054):** `plan_overrides` (org_id PK, original_plan, override_plan, reason, created_by, expires_at), `platform_settings` (single row — signup_enabled / maintenance_mode / default_free_plan / support_email; only the wired toggles). Email logging is provided by `0053_email` (`email_outbox` / `email_log`), not duplicated here.
+
+**Limits / follow-ups:** no member impersonation (deliberate); `platform_settings` toggles are stored + audited but not yet enforced in signup / the app shell; Plans view is read-only (`plan_limits` stays the pricing source of truth, edited via migration); ARR is hidden until there is real subscription data (prod currently has 0 subscriptions → MRR ₦0).
 
 ### Help & Support (`/help`, `0052`)
 
@@ -520,6 +540,61 @@ Entirely separate from office roles. `platform_admins` + `is_platform_admin()` (
 | Own workspace (dashboard, learning, goals, network, freelance, wallet, help, security) | — | ✅ | ✅ | ✅ | ✅ |
 
 RLS enforces every row of this; frontend role checks are convenience only.
+
+## 15b. Transactional email (Resend — migrations `0053`, `0055`, `0056`)
+
+Email is a **second delivery channel beside** in-app notifications, not a replacement. The model is layered: routine product activity stays in-app only; important / time-sensitive / account / financial / administrative items also get an email; a subset is user-controllable.
+
+### Layers
+
+| Piece | File | Role |
+| --- | --- | --- |
+| Resend API client | `supabase/functions/_shared/email.ts` | The **only** code that calls `api.resend.com`. `sendEmail()` (low-level) + `sendTransactionalEmail()` (resolves branding, renders template, sends, never throws). |
+| Templates | `supabase/functions/_shared/email-templates.ts` | One inline-styled, table-based `baseLayout()` + a `renderTemplate(type, data)` registry. No website CSS. Office name + "powered by Bizzlivo" always; org logo / brand colour only when the plan grants `custom_branding`. |
+| `email_outbox` | table | Durable queue for **server / trigger-originated** mail. `pending → processing → sent / failed`, `attempt_count` capped at `max_attempts` (5) with exponential backoff, 15-min stuck-row reclaim. Unique `dedupe_key`. |
+| `email_log` | table | One row per send attempt (no message body). `org_id, recipient, email_type, category, subject, provider_message_id, status, error_message, related_entity_*`, unique `dedupe_key`. Office admins read their org via `email_log_admin_v` (no `template_data`); platform admins read all. No client writes to either table. |
+| `enqueue_email(...)` | RPC (SECURITY DEFINER) | The one safe path to queue mail. Resolves recipient email (`auth.users` → `profiles`), blocks cross-tenant / suspended-org / non-member targets, applies the preference gate, dedupes. Callable by members of the org, platform admins, and service-role Edge functions. |
+| `send-email` | Edge Function (JWT-verified) | **Client-triggered** synchronous mail so the UI can show sent / failed. Actions: `invite_resend`, `finance_notice`. Re-derives caller, re-checks org admin role, rate-limits (`recent_email_count`), logs via `log_email_send`. |
+| `process-email-outbox` | Edge Function | Drains the outbox. Auth: `x-worker-secret` (`EMAIL_WORKER_SECRET`) or platform-admin JWT for large batches; any signed-in user may nudge a batch of ≤10. **No pg_cron yet** — invoked lazily from `AuthContext` on load, and can be wired to an external scheduler later. |
+
+### Event flow
+
+Domain event → in-app notification (unchanged) → decision gate → maybe `email_outbox`:
+
+- **`notifications` bridge trigger** (`notification_email_bridge`): a whitelist of notification types (`goal_setup_reminder`, `goal_deadline`, `goal_approved`, `goal_changes_requested`, `goal_rejected`, `goal_month_closed`) enqueues a `notification_digest` email, deduped on `notif:<id>`.
+- **`withdrawal_requests` trigger** (`withdrawal_email_notify`): on status change to `requested / approved / processing / paid / rejected`, enqueues a `withdrawal_update` email to the member with amount, currency, reference, status and a **masked** account tail (`****1234` — full numbers never leave the DB). `cancelled` sends nothing. Deduped on `wd:<id>:<status>`.
+- **`office_announcements` fan-out** (`announcement_fanout`, extended): when the admin ticks **Send email** (`send_email` column), each resolved recipient also gets an `office_announcement` email. Deduped on `ann:<id>:<user>`.
+- **`support_tickets` trigger** (`support_ticket_email_notify`): new ticket → confirmation to creator + alert to each office admin; `admin_note` change → "there's an update" to creator (never the note text); `resolved / closed` → outcome to creator.
+- **Billing** (`activatePaidPlan` in `_shared/paystack.ts`): on activation / renewal, a `billing_update` email to office admins. Does **not** duplicate Paystack's card receipt.
+- **Member invite** (`approve-pending-member`, `send-email` `invite_resend`): the invite link email, via the shared service + verified sender.
+
+### Preferences (`notification_prefs`, extended in `0053`)
+
+Email mirror columns: `email_account` (always on, not a toggle), `email_goals`, `email_finance`, `email_events`, `email_announcements` (default on), `email_learning` (default off). `enqueue_email` bypasses the gate for the essential categories `account / security / billing / support / invite`. UI: `Settings → Notifications → "Email me about"`.
+
+### Rules that hold regardless of Resend
+
+- **Finance / goals / announcements never depend on email.** Server-side code only ever does a local `INSERT` into `email_outbox`. A Resend outage leaves rows `pending` / `failed`; the business transaction already committed. A DB-approved withdrawal stays approved.
+- `RESEND_API_KEY` is read only in `_shared/email.ts`, never returned in a response, never logged.
+- `from` is server-forced (`RESEND_FROM_EMAIL` / `RESEND_FROM_NAME`); clients cannot set it.
+- Template values are HTML-escaped; announcement / support bodies render as escaped text; CTA URLs are normalised onto `APP_URL`.
+
+### DNS — required before mail actually sends
+
+Resend rejects sends from an unverified domain (verified in testing: pipeline runs end-to-end, Resend returns `403 domain is not verified`). To go live, verify a Bizzlivo sending domain in Resend and add its records to the Netlify DNS zone for `bizzlivo.com`. Recommended sending subdomain `mail.bizzlivo.com` (keeps the apex SPF free):
+
+| Type | Host | Value |
+| --- | --- | --- |
+| MX | `send.mail.bizzlivo.com` | `feedback-smtp.<region>.amazonses.com` (priority 10) |
+| TXT | `send.mail.bizzlivo.com` | `v=spf1 include:amazonses.com ~all` |
+| TXT | `resend._domainkey.mail.bizzlivo.com` | DKIM value from the Resend dashboard |
+| TXT | `_dmarc.bizzlivo.com` | `v=DMARC1; p=none; rua=mailto:dmarc@bizzlivo.com` |
+
+Then set `RESEND_FROM_EMAIL=notifications@mail.bizzlivo.com` (or `@bizzlivo.com` if the apex is verified instead). Until then `RESEND_FROM_EMAIL` is set to `notifications@bizzlivo.com` and every send is logged as `failed` with the verification error.
+
+### Scheduler-dependent (documented, not built)
+
+There is no pg_cron. True scheduled email — 1st-of-month goal-setup reminders at a fixed time, 24h / 1h event reminders — is **not** implemented as scheduled. Goal reminders are lazily evaluated on Goals-page load (and their email rides that). **Event reminders send no email today.** When a scheduler is added, point it at `process-email-outbox` (with `EMAIL_WORKER_SECRET`) and at the lazy reminder RPCs.
 
 ## 16. Billing and plan enforcement
 
@@ -567,7 +642,9 @@ New offices attempt a 14-day Growth trial (`start_trial`). Status is reconciled 
 | Function | Access model | Responsibility |
 |---|---|---|
 | `accept-invite` | Anonymous preview; authenticated acceptance | Preview invite, create profile/membership, attach matching guest history |
-| `approve-pending-member` | Authenticated admin | Approve request, create invite, send Resend email |
+| `approve-pending-member` | Authenticated admin | Approve request, create invite, send the invite email via `_shared/email.ts` |
+| `send-email` | Authenticated (JWT) | Client-triggered transactional email — `invite_resend`, `finance_notice`; re-checks org admin role, rate-limits, logs |
+| `process-email-outbox` | Worker secret / platform admin / any signed-in user (small batch) | Drains `email_outbox` to Resend; records outcome in `email_log` |
 | `check-exam-link-account` | Anonymous | Detect whether public-exam email already has a profile |
 | `confirm-exam-signup` | Anonymous but scoped by public exam token | Confirm a user created through a valid public exam flow |
 | `confirm-invite-signup` | Anonymous but scoped by invite token/email | Confirm a user created through an invitation |

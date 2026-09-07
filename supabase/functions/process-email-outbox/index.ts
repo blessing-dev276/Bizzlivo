@@ -32,9 +32,17 @@ Deno.serve(async (req) => {
   // --- authorise -------------------------------------------------
   const workerSecret = Deno.env.get('EMAIL_WORKER_SECRET')
   const providedSecret = req.headers.get('x-worker-secret')
-  let authorised = !!workerSecret && providedSecret === workerSecret
+  const secretOk = !!workerSecret && providedSecret === workerSecret
 
-  if (!authorised) {
+  // Batch ceiling: trusted callers (worker secret / platform admin) can
+  // drain large batches; any signed-in user may nudge a small batch
+  // (safe — the outbox only ever holds already-authorised, deduped mail
+  // with per-row attempt caps).
+  let maxBatch = 10
+  let authorised = secretOk
+  if (secretOk) {
+    maxBatch = 100
+  } else {
     const authHeader = req.headers.get('Authorization')
     if (authHeader) {
       const caller = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -42,8 +50,9 @@ Deno.serve(async (req) => {
       })
       const { data: u } = await caller.auth.getUser()
       if (u?.user) {
+        authorised = true
         const { data: isAdmin } = await caller.rpc('is_platform_admin')
-        authorised = isAdmin === true
+        if (isAdmin === true) maxBatch = 100
       }
     }
   }
@@ -51,10 +60,10 @@ Deno.serve(async (req) => {
 
   // --- drain ---------------------------------------------------
   const db = serviceClient()
-  let batchSize = 25
+  let batchSize = Math.min(25, maxBatch)
   try {
     const body = await req.json().catch(() => ({}))
-    if (typeof body?.limit === 'number') batchSize = Math.max(1, Math.min(body.limit, 100))
+    if (typeof body?.limit === 'number') batchSize = Math.max(1, Math.min(body.limit, maxBatch))
   } catch {
     /* no body */
   }

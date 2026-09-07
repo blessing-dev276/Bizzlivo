@@ -118,5 +118,45 @@ export async function activatePaidPlan(
     .eq('id', params.orgId)
   if (orgError) throw orgError
 
+  // Billing confirmation email to office admins — best-effort, never
+  // blocks activation. Paystack already sent the payer a card receipt;
+  // this is the "your plan is now active" notice, not a receipt.
+  try {
+    const { data: admins } = await db
+      .from('memberships')
+      .select('user_id')
+      .eq('org_id', params.orgId)
+      .eq('status', 'active')
+      .eq('role', 'admin')
+    const planLabel = params.plan.charAt(0).toUpperCase() + params.plan.slice(1)
+    for (const a of admins ?? []) {
+      await db.rpc('enqueue_email', {
+        p_org: params.orgId,
+        p_recipient_user: a.user_id,
+        p_email_type: 'billing_update',
+        p_category: 'billing',
+        p_template_data: {
+          template_type: 'billing_update',
+          subject: `Your ${planLabel} plan is active`,
+          headline: `Your ${planLabel} plan is now active`,
+          message: `Your office is now on the ${planLabel} plan (${params.billingCycle}). Thanks for upgrading.`,
+          plan: planLabel,
+          renews_on: new Date(periodEnd).toLocaleDateString('en-NG', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }),
+          cta_label: 'View billing',
+          cta_path: '/settings',
+        },
+        p_dedupe_key: `bill:${params.orgId}:${params.plan}:${periodEnd}:${a.user_id}`,
+        p_related_type: 'org',
+        p_related_id: params.orgId,
+      })
+    }
+  } catch {
+    /* email is non-critical */
+  }
+
   return { alreadyProcessed: false }
 }

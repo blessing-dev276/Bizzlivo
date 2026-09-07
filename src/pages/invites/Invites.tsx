@@ -89,6 +89,7 @@ export default function Invites() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [approveNotice, setApproveNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [drawerMember, setDrawerMember] = useState<MemberRow | null>(null)
@@ -200,22 +201,46 @@ export default function Invites() {
     setSubmitting(true)
 
     const expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
-    const { error: insertError } = await supabase.from('invites').insert({
-      org_id: orgId,
-      email,
-      role,
-      token: crypto.randomUUID(),
-      invited_by: profile.id,
-      expires_at: expiresAt,
-    })
+    const { data: inserted, error: insertError } = await supabase
+      .from('invites')
+      .insert({
+        org_id: orgId,
+        email,
+        role,
+        token: crypto.randomUUID(),
+        invited_by: profile.id,
+        expires_at: expiresAt,
+      })
+      .select('id')
+      .single()
 
-    setSubmitting(false)
     if (insertError) {
+      setSubmitting(false)
       setError(insertError.message)
       return
     }
+
+    // Send the invite email (best-effort — the invite row already exists,
+    // so a delivery failure just surfaces a "copy the link" hint).
+    let emailFailed = false
+    try {
+      const { data: sendRes } = await supabase.functions.invoke('send-email', {
+        body: { action: 'invite_resend', inviteId: inserted.id, siteUrl: window.location.origin },
+      })
+      emailFailed = !sendRes?.sent
+    } catch {
+      emailFailed = true
+    }
+
+    setSubmitting(false)
     setEmail('')
     setShowInviteModal(false)
+    if (emailFailed) {
+      setApproveNotice({
+        type: 'error',
+        text: `Invite created for ${email}, but the email could not be sent. Copy their invite link from Pending invites below and send it yourself.`,
+      })
+    }
     await load()
   }
 
@@ -227,6 +252,27 @@ export default function Invites() {
     await navigator.clipboard.writeText(inviteLink(token))
     setCopiedId(id)
     setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500)
+  }
+
+  async function resendInvite(invite: Invite) {
+    setResendingId(invite.id)
+    setApproveNotice(null)
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('send-email', {
+        body: { action: 'invite_resend', inviteId: invite.id, siteUrl: window.location.origin },
+      })
+      if (fnError || !data?.sent) {
+        setApproveNotice({
+          type: 'error',
+          text: data?.error ?? 'The invite email could not be sent. Copy the link and send it manually.',
+        })
+      } else {
+        setApproveNotice({ type: 'success', text: `Invite email re-sent to ${invite.email}.` })
+      }
+    } catch {
+      setApproveNotice({ type: 'error', text: 'The invite email could not be sent.' })
+    }
+    setResendingId(null)
   }
 
   async function approvePendingMember(pm: PendingMemberRow) {
@@ -465,9 +511,19 @@ export default function Invites() {
                 <div className="cell-dim">{invite.email}</div>
                 <div className="cell-dim">{ROLE_LABEL[invite.role]}</div>
                 <div className="cell-dim">{new Date(invite.expires_at).toLocaleDateString()}</div>
-                <button type="button" className="btn-ghost" onClick={() => copyLink(invite.id, invite.token)}>
-                  {copiedId === invite.id ? 'Copied!' : 'Copy link'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={resendingId === invite.id}
+                    onClick={() => resendInvite(invite)}
+                  >
+                    {resendingId === invite.id ? 'Sending…' : 'Resend email'}
+                  </button>
+                  <button type="button" className="btn-ghost" onClick={() => copyLink(invite.id, invite.token)}>
+                    {copiedId === invite.id ? 'Copied!' : 'Copy link'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
