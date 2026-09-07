@@ -1,55 +1,57 @@
 import BrandLogo from '../../components/BrandLogo'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
-import { completeOfficeSignup } from '../../lib/completeSignup'
-import { useAuth } from '../../lib/AuthContext'
+import { requestOfficeSignup } from '../../lib/completeSignup'
 import ThemeToggle from '../../components/ThemeToggle'
 
 export default function Signup() {
   const navigate = useNavigate()
-  const { refresh, setCurrentOrgId } = useAuth()
   const [fullName, setFullName] = useState('')
   const [officeName, setOfficeName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Once the confirmation email is on its way we swap the form for a
+  // "check your inbox" panel — the office is created on first login
+  // after the user confirms.
+  const [sent, setSent] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendNote, setResendNote] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setSubmitting(true)
 
-    try {
-      // full_name/office_name ride along as user metadata so they survive
-      // even if email confirmation defers session creation to a later,
-      // separate login — see completeOfficeSignup for why.
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName, office_name: officeName } },
-      })
-      if (signUpError) throw signUpError
-      const user = signUpData.user
-      if (!user) throw new Error('Sign up did not return a user. Please try again.')
+    const result = await requestOfficeSignup({ fullName, officeName, email, password })
+    setSubmitting(false)
 
-      if (!signUpData.session) {
-        setSubmitting(false)
-        navigate('/login', {
-          state: { message: 'Check your email to confirm your account, then log in to finish setting up your office.' },
-        })
-        return
-      }
-
-      const orgId = await completeOfficeSignup(user)
-      await refresh()
-      if (orgId) setCurrentOrgId(orgId)
-      navigate('/onboarding')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-      setSubmitting(false)
+    if (result.ok) {
+      setSent(true)
+      return
     }
+    if (result.code === 'already_confirmed') {
+      navigate('/login', {
+        state: { message: 'This email is already confirmed — log in to continue.' },
+      })
+      return
+    }
+    setError(result.error)
+  }
+
+  async function handleResend() {
+    setResending(true)
+    setResendNote(null)
+    const result = await requestOfficeSignup({ fullName, officeName, email, password })
+    setResending(false)
+    setResendNote(
+      result.ok
+        ? `We've sent another confirmation email to ${email}.`
+        : result.error,
+    )
   }
 
   return (
@@ -63,47 +65,81 @@ export default function Signup() {
         <div className="auth-logo">
           <BrandLogo size={30} tagline />
         </div>
-        <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Create your office</h1>
-        <p className="auth-subtitle">Set up Bizzlivo for your team in a couple of minutes.</p>
 
-        <label>
-          Your full name
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
-        </label>
+        {sent ? (
+          <div className="auth-card">
+            <h1>Confirm your email</h1>
+            <p className="auth-subtitle">
+              We've sent a confirmation link to <strong>{email}</strong>. Open it to activate
+              your account, then log in to finish setting up <strong>{officeName}</strong>.
+            </p>
+            <p className="form-info" style={{ marginBottom: 16 }}>
+              Can't find it? Check your spam folder — the email is from Bizzlivo.
+            </p>
 
-        <label>
-          Office name
-          <input value={officeName} onChange={(e) => setOfficeName(e.target.value)} required placeholder="e.g. Acme Realty" />
-        </label>
+            {resendNote && <p className="form-info">{resendNote}</p>}
 
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
-        </label>
+            <button type="button" onClick={handleResend} disabled={resending}>
+              {resending ? 'Sending…' : 'Resend confirmation email'}
+            </button>
 
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </label>
+            <p className="auth-switch">
+              Already confirmed? <Link to="/login">Log in</Link>
+            </p>
+          </div>
+        ) : (
+          <form className="auth-card" onSubmit={handleSubmit}>
+            <h1>Create your office</h1>
+            <p className="auth-subtitle">Set up Bizzlivo for your team in a couple of minutes.</p>
 
-        {error && <p className="form-error">{error}</p>}
+            <label>
+              Your full name
+              <input value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" />
+            </label>
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Creating your office…' : 'Create office'}
-        </button>
+            <label>
+              Office name
+              <input value={officeName} onChange={(e) => setOfficeName(e.target.value)} required placeholder="e.g. Acme Realty" />
+            </label>
 
-        <p className="auth-switch">
-          Already have an account? <Link to="/login">Log in</Link>
-        </p>
-        </form>
+            <label>
+              Email
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+            </label>
+
+            <label>
+              Password
+              <span className="pw-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="pw-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </span>
+            </label>
+
+            {error && <p className="form-error">{error}</p>}
+
+            <button type="submit" disabled={submitting}>
+              {submitting ? 'Creating your office…' : 'Create office'}
+            </button>
+
+            <p className="auth-switch">
+              Already have an account? <Link to="/login">Log in</Link>
+            </p>
+          </form>
+        )}
       </div>
     </div>
   )

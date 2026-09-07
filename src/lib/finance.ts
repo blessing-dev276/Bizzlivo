@@ -149,6 +149,55 @@ export async function listPayoutAccounts(orgId: string, userId: string): Promise
   return (data as MemberPayoutAccount[]) ?? []
 }
 
+export interface NigerianBank {
+  name: string
+  code: string
+}
+
+// Cached for the tab's lifetime — the list is ~200 entries and changes rarely.
+let bankListPromise: Promise<NigerianBank[]> | null = null
+
+export function listNigerianBanks(): Promise<NigerianBank[]> {
+  if (!bankListPromise) {
+    bankListPromise = supabase.functions
+      .invoke('resolve-bank-account', { body: { action: 'banks' } })
+      .then(({ data, error }) => {
+        if (error || !data?.banks) {
+          bankListPromise = null // let the next call retry
+          throw new Error(error?.message ?? 'Could not load the bank list.')
+        }
+        return data.banks as NigerianBank[]
+      })
+  }
+  return bankListPromise
+}
+
+/**
+ * Confirms the account holder's name from the account number + bank via
+ * Paystack NUBAN resolution. Throws with a user-facing message on failure
+ * (bad number, unknown account, provider down).
+ */
+export async function resolveBankAccount(accountNumber: string, bankCode: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('resolve-bank-account', {
+    body: { action: 'resolve', account_number: accountNumber, bank_code: bankCode },
+  })
+  if (error) {
+    // The real reason is in the JSON body of the non-2xx response.
+    const ctx = (error as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = await ctx.json()
+        if (body?.error) throw new Error(String(body.error))
+      } catch (e) {
+        if (e instanceof Error && e.message) throw e
+      }
+    }
+    throw new Error('We could not verify that account. Please try again.')
+  }
+  if (!data?.account_name) throw new Error('We could not verify that account.')
+  return String(data.account_name)
+}
+
 // ---------- calculation preview (client mirror of finance_credit_available) ----------
 
 export interface CreditPreview {

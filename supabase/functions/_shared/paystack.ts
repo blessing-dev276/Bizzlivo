@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
-const PLAN_CODES = ['free', 'growth', 'business'] as const
+const PLAN_CODES = ['starter', 'growth', 'business'] as const
 export type PlanCode = (typeof PLAN_CODES)[number]
 export type BillingCycle = 'monthly' | 'yearly'
 export type PaymentProvider = 'paystack' | 'flutterwave'

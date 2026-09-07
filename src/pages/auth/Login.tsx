@@ -7,7 +7,10 @@ import ThemeToggle from '../../components/ThemeToggle'
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
-  const infoMessage = (location.state as { message?: string } | null)?.message
+  const confirmed = new URLSearchParams(location.search).get('confirmed') === '1'
+  const infoMessage =
+    (location.state as { message?: string } | null)?.message ??
+    (confirmed ? 'Your email is confirmed — log in to finish setting up your office.' : undefined)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

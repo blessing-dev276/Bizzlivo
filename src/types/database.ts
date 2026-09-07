@@ -9,7 +9,10 @@ export type QuestionType = 'mcq' | 'true_false' | 'multi_select'
 export type AttemptStatus = 'in_progress' | 'submitted' | 'expired'
 export type InviteStatus = 'pending' | 'accepted' | 'expired'
 export type CourseworkSubmissionStatus = 'submitted' | 'approved' | 'rejected' | 'changes_requested'
-export type PlanTier = 'free' | 'growth' | 'business'
+// The three purchasable packages. 'free' / 'expired' are internal states
+// an org can be parked in (pre-trial / lapsed) — never something you buy.
+export type PlanTier = 'starter' | 'growth' | 'business'
+export type PlanTierState = PlanTier | 'free' | 'expired'
 export type BillingCycle = 'monthly' | 'yearly'
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired'
 export type EventCategory =
@@ -297,15 +300,15 @@ export interface Notification {
 export type ReportsLevel = 'basic' | 'full' | 'advanced'
 
 export interface PlanLimits {
-  plan: PlanTier
+  plan: PlanTierState
   price_monthly_kobo: number
   price_yearly_kobo: number
   max_members: number | null
   max_admins: number | null
   max_resources: number | null
   max_published_exams: number | null
-  ai_exam_generations_per_month: number
-  ai_questions_per_month: number
+  ai_exam_generations_per_month: number | null
+  ai_questions_per_month: number | null
   reports_level: ReportsLevel
   removes_badge: boolean
   custom_branding: boolean
@@ -342,7 +345,7 @@ export interface PaymentEvent {
 // Shape returned by the get_org_usage(target_org_id) RPC — plan + trial
 // state + usage-vs-limit for every metered resource, in one round trip.
 export interface OrgUsage {
-  plan: PlanTier
+  plan: PlanTierState
   status: SubscriptionStatus | null
   billing_cycle: BillingCycle | null
   trial_ends_at: string | null
@@ -357,9 +360,9 @@ export interface OrgUsage {
   resource_count: number
   max_published_exams: number | null
   published_exam_count: number
-  ai_exam_generations_per_month: number
+  ai_exam_generations_per_month: number | null
   ai_exam_generations_used: number
-  ai_questions_per_month: number
+  ai_questions_per_month: number | null
   ai_questions_used: number
   reports_level: ReportsLevel
   removes_badge: boolean

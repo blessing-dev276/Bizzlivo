@@ -19,10 +19,13 @@ import {
   listOrders,
   listPayoutAccounts,
   listWithdrawals,
+  listNigerianBanks,
+  resolveBankAccount,
   money,
   moneyList,
   requestWithdrawal,
   cancelWithdrawal,
+  type NigerianBank,
 } from '../../lib/finance'
 import { OrderBreakdown, OrderStatusPill, WithdrawalStatusPill } from '../finance/shared'
 
@@ -336,19 +339,70 @@ function PayoutAccounts({
   orgId, userId, accounts, onChange,
 }: { orgId: string; userId: string; accounts: MemberPayoutAccount[]; onChange: () => void }) {
   const [adding, setAdding] = useState(false)
-  const [bankName, setBankName] = useState('')
-  const [accountName, setAccountName] = useState('')
-  const [accountNumber, setAccountNumber] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Bank picker (searchable list of every Nigerian bank).
+  const [banks, setBanks] = useState<NigerianBank[]>([])
+  const [banksError, setBanksError] = useState<string | null>(null)
+  const [bankQuery, setBankQuery] = useState('')
+  const [bankOpen, setBankOpen] = useState(false)
+  const [bankCode, setBankCode] = useState('')
+  const [bankName, setBankName] = useState('')
+
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountName, setAccountName] = useState('') // resolved, never typed
+  const [resolving, setResolving] = useState(false)
+  const [resolveError, setResolveError] = useState<string | null>(null)
+
+  function resetForm() {
+    setBankQuery(''); setBankOpen(false); setBankCode(''); setBankName('')
+    setAccountNumber(''); setAccountName(''); setResolving(false); setResolveError(null)
+  }
+
+  // Load the bank list the first time the form is opened.
+  useEffect(() => {
+    if (!adding || banks.length > 0) return
+    let cancelled = false
+    setBanksError(null)
+    listNigerianBanks()
+      .then((list) => { if (!cancelled) setBanks(list) })
+      .catch((e) => { if (!cancelled) setBanksError(e instanceof Error ? e.message : 'Could not load banks.') })
+    return () => { cancelled = true }
+  }, [adding, banks.length])
+
+  // Auto-confirm the account name from the number + bank (debounced).
+  useEffect(() => {
+    setAccountName('')
+    setResolveError(null)
+    if (!bankCode || !/^\d{10}$/.test(accountNumber)) return
+    let cancelled = false
+    setResolving(true)
+    const t = setTimeout(() => {
+      resolveBankAccount(accountNumber, bankCode)
+        .then((name) => { if (!cancelled) setAccountName(name) })
+        .catch((e) => { if (!cancelled) setResolveError(e instanceof Error ? e.message : 'Could not verify account.') })
+        .finally(() => { if (!cancelled) setResolving(false) })
+    }, 450)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [accountNumber, bankCode])
+
+  const filteredBanks = useMemo(() => {
+    const q = bankQuery.trim().toLowerCase()
+    const list = q ? banks.filter((b) => b.name.toLowerCase().includes(q)) : banks
+    return list.slice(0, 40)
+  }, [banks, bankQuery])
+
+  const canSave = !!bankCode && /^\d{10}$/.test(accountNumber) && !!accountName && !resolving
 
   async function add(e: FormEvent) {
     e.preventDefault()
+    if (!canSave) return
     setBusy(true)
     await supabase.from('member_payout_accounts').insert({
       org_id: orgId, user_id: userId, bank_name: bankName.trim(), account_name: accountName.trim(),
       account_number: accountNumber.trim(), is_default: accounts.length === 0,
     })
-    setBusy(false); setAdding(false); setBankName(''); setAccountName(''); setAccountNumber('')
+    setBusy(false); setAdding(false); resetForm()
     onChange()
   }
 
@@ -379,13 +433,64 @@ function PayoutAccounts({
       {adding ? (
         <form onSubmit={add} className="upload-panel" style={{ marginTop: 10 }}>
           <div className="field-row">
-            <label>Bank name<input value={bankName} onChange={(e) => setBankName(e.target.value)} required /></label>
-            <label>Account name<input value={accountName} onChange={(e) => setAccountName(e.target.value)} required /></label>
-            <label>Account number<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required /></label>
+            {/* Bank — searchable list of every Nigerian bank */}
+            <label style={{ position: 'relative' }}>
+              Bank
+              <input
+                value={bankOpen ? bankQuery : bankName}
+                onChange={(e) => { setBankQuery(e.target.value); setBankOpen(true); setBankCode(''); setBankName('') }}
+                onFocus={() => { setBankQuery(''); setBankOpen(true) }}
+                onBlur={() => setTimeout(() => setBankOpen(false), 150)}
+                placeholder={banksError ? 'Bank list unavailable' : 'Search banks…'}
+                autoComplete="off"
+                required
+              />
+              {bankOpen && (
+                <div className="combo-menu">
+                  {banks.length === 0 && !banksError && <div className="combo-empty">Loading banks…</div>}
+                  {banksError && <div className="combo-empty">{banksError}</div>}
+                  {banks.length > 0 && filteredBanks.length === 0 && <div className="combo-empty">No match</div>}
+                  {filteredBanks.map((b) => (
+                    <button
+                      type="button"
+                      key={b.code}
+                      className="combo-item"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { setBankCode(b.code); setBankName(b.name); setBankQuery(''); setBankOpen(false) }}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </label>
+
+            {/* Account number comes before the name, which is derived from it */}
+            <label>
+              Account number
+              <input
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                inputMode="numeric"
+                placeholder="10 digits"
+                required
+              />
+            </label>
+
+            <label>
+              Account name
+              <input
+                value={resolving ? 'Verifying…' : accountName}
+                readOnly
+                placeholder="Auto-filled from your account number"
+                tabIndex={-1}
+              />
+            </label>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" disabled={busy || !bankName || !accountName || !accountNumber}>Save account</button>
-            <button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button>
+          {resolveError && <p className="form-error" style={{ marginTop: 6 }}>{resolveError}</p>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button type="submit" disabled={busy || !canSave}>Save account</button>
+            <button type="button" className="secondary" onClick={() => { setAdding(false); resetForm() }}>Cancel</button>
           </div>
         </form>
       ) : (

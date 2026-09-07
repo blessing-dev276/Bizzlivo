@@ -3,7 +3,8 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { trialDaysLeft, useOrgUsage } from '../lib/plans'
-import { PLAN_META } from '../lib/entitlements'
+import { PLAN_META, needsPlanSelection } from '../lib/entitlements'
+import type { PlanTier } from '../types/database'
 import ThemeToggle from './ThemeToggle'
 import NotificationBell from './NotificationBell'
 import ProfileMenu from './ProfileMenu'
@@ -386,12 +387,21 @@ export default function Layout({ children }: { children: ReactNode }) {
   const closeMenu = () => setMenuOpen(false)
 
   const daysLeft = usage ? trialDaysLeft(usage) : null
-  const planBadgeClass = usage ? (usage.status === 'trialing' ? 'trialing' : usage.plan !== 'free' ? 'active' : '') : ''
-  const planLabel = usage
-    ? usage.status === 'trialing' && daysLeft !== null
-      ? `Trial · ${daysLeft}d left`
-      : PLAN_META[usage.plan].label
-    : null
+  const needsPlan = needsPlanSelection(usage)
+  const planBadgeClass = usage
+    ? needsPlan
+      ? 'expired'
+      : usage.status === 'trialing'
+        ? 'trialing'
+        : 'active'
+    : ''
+  const planLabel = !usage
+    ? null
+    : needsPlan
+      ? 'Trial ended'
+      : usage.status === 'trialing' && daysLeft !== null
+        ? `Trial · ${daysLeft}d left`
+        : PLAN_META[usage.plan as PlanTier]?.label ?? '—'
   const isTopTier = usage?.plan === 'business' && usage.status !== 'trialing'
   const org = currentMembership?.organization
   const canSwitchOffice = memberships.length > 1

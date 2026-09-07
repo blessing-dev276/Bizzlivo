@@ -5,6 +5,8 @@ import { getOfficeSlugFromHost, officeSubdomainOrigin, officeSubdomainsEnabled }
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import AppSkeleton, { PageSkeleton } from './components/AppSkeleton'
+import { useOrgUsage } from './lib/plans'
+import { needsPlanSelection } from './lib/entitlements'
 
 // Public entry points stay eager — no skeleton flash on first paint.
 import Login from './pages/auth/Login'
@@ -71,11 +73,47 @@ const HelpCenter = lazy(() => import('./pages/help/HelpCenter'))
 const Wallet = lazy(() => import('./pages/wallet/Wallet'))
 const FinanceWorkspace = lazy(() => import('./pages/finance/FinanceWorkspace'))
 
+// After the 30-day trial (or a lapsed paid period) with no package chosen,
+// the office is hard-locked. Admins can still reach Billing + Help to fix
+// it; everyone else gets a dead end pointing at their admin.
+const PLAN_GATE_ALLOW = ['/settings/billing', '/help']
+
+function PlanGate({ children }: { children: ReactNode }) {
+  const { currentMembership } = useAuth()
+  const { usage, loading } = useOrgUsage(currentMembership?.organization.id)
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+
+  if (loading || !needsPlanSelection(usage)) return <>{children}</>
+  if (PLAN_GATE_ALLOW.some((p) => pathname.startsWith(p))) return <>{children}</>
+
+  const isAdmin = currentMembership?.role === 'admin'
+  return (
+    <div className="page">
+      <div className="auth-card" style={{ maxWidth: 460, margin: '48px auto', textAlign: 'center' }}>
+        <h1>Your free trial has ended</h1>
+        {isAdmin ? (
+          <>
+            <p>Pick a package to unlock {currentMembership?.organization.name ?? 'your office'} again. Your data is safe — nothing has been deleted.</p>
+            <button type="button" onClick={() => navigate('/settings/billing')}>Choose a package</button>
+          </>
+        ) : (
+          <p className="form-error">
+            This office is locked until an admin chooses a package. Please reach out to your office admin.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Protected({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
       <Layout>
-        <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+        <Suspense fallback={<PageSkeleton />}>
+          <PlanGate>{children}</PlanGate>
+        </Suspense>
       </Layout>
     </ProtectedRoute>
   )
@@ -133,7 +171,7 @@ function OfficeAwareRoot({ slug }: { slug: string }) {
   return (
     <Layout>
       <Suspense fallback={<PageSkeleton />}>
-        <Dashboard />
+        <PlanGate><Dashboard /></PlanGate>
       </Suspense>
     </Layout>
   )

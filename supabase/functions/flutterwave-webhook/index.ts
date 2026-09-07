@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const orgId = meta.org_id
     const plan = meta.plan
     const billingCycle = meta.billing_cycle as BillingCycle | undefined
-    if (typeof orgId !== 'string' || !isValidPlanCode(plan) || plan === 'free' || (billingCycle !== 'monthly' && billingCycle !== 'yearly')) {
+    if (typeof orgId !== 'string' || !isValidPlanCode(plan) || (billingCycle !== 'monthly' && billingCycle !== 'yearly')) {
       return jsonResponse({ received: true, skipped: 'missing/invalid metadata on transaction' })
     }
 

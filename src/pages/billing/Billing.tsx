@@ -15,8 +15,10 @@ import {
   monthsFreeLabel,
   seatState,
   subscriptionStatusLabel,
+  planLabel,
+  needsPlanSelection,
 } from '../../lib/entitlements'
-import type { BillingCycle, PlanLimits, PlanTier, PaymentEvent } from '../../types/database'
+import type { BillingCycle, PlanLimits, PlanTier, PlanTierState, PaymentEvent } from '../../types/database'
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined
 const FLUTTERWAVE_PUBLIC_KEY = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY as string | undefined
@@ -192,15 +194,16 @@ export default function Billing() {
   }
 
   const daysLeft = usage ? trialDaysLeft(usage) : null
-  const currentPlan: PlanTier = usage?.plan ?? 'free'
-  const isPaid = currentPlan !== 'free'
-  const currentLimit = limitByPlan.get(currentPlan)
+  const currentPlan: PlanTierState = usage?.plan ?? 'expired'
+  const locked = needsPlanSelection(usage)
+  const isPaid = !!usage && !locked && (usage.status === 'active' || usage.status === 'trialing')
+  const currentLimit = limitByPlan.get(currentPlan as PlanTier)
   const paidAmount = usage?.amount_kobo ?? (currentLimit
     ? (usage?.billing_cycle === 'yearly' ? currentLimit.price_yearly_kobo : currentLimit.price_monthly_kobo)
     : 0)
 
   const renewLine = (() => {
-    if (!usage || currentPlan === 'free') return 'Not applicable'
+    if (!usage || !isPaid) return 'Not applicable'
     if (usage.status === 'trialing') return `Trial ends ${fmtDate(usage.trial_ends_at)}`
     if (usage.cancel_at_period_end) return `Access ends ${fmtDate(usage.current_period_end)}`
     return usage.current_period_end ? `Renews ${fmtDate(usage.current_period_end)}` : '—'
@@ -213,15 +216,21 @@ export default function Billing() {
         <p>Manage your Bizzlivo subscription, usage and organization plan.</p>
       </div>
 
-      {usage?.status === 'trialing' && daysLeft !== null && (
-        <div className={`billing-banner ${daysLeft <= 3 ? 'warn' : ''}`}>
-          <p><strong>Trial — {daysLeft} day{daysLeft === 1 ? '' : 's'} left.</strong> Choose a plan below to keep Growth-tier access.</p>
+      {locked && (
+        <div className="billing-banner warn">
+          <p><strong>Your 30-day trial has ended.</strong> Pick a package below to unlock your office — members can't sign in or work until you do.</p>
+          <span className="badge expired">Locked</span>
+        </div>
+      )}
+      {!locked && usage?.status === 'trialing' && daysLeft !== null && (
+        <div className={`billing-banner ${daysLeft <= 5 ? 'warn' : ''}`}>
+          <p><strong>Free trial — {daysLeft} day{daysLeft === 1 ? '' : 's'} left.</strong> Pick a package before it ends to keep your office running without interruption.</p>
           <span className="badge trialing">Trial</span>
         </div>
       )}
-      {usage && usage.status !== 'trialing' && isPaid && usage.cancel_at_period_end && (
+      {!locked && usage && usage.status !== 'trialing' && isPaid && usage.cancel_at_period_end && (
         <div className="billing-banner warn">
-          <p>Your plan won't renew — access continues until {fmtDate(usage.current_period_end)}, then reverts to Free.</p>
+          <p>Your plan won't renew — access continues until {fmtDate(usage.current_period_end)}, then the office is locked until you pick a package.</p>
           <button type="button" className="secondary" disabled={busy} onClick={() => runRpc('resume_subscription', "Your plan will keep renewing.")}>
             Keep my plan
           </button>
@@ -236,8 +245,8 @@ export default function Billing() {
         <section className="billing-panel">
           <span className="bp-eyebrow">Current plan</span>
           <div className="bp-plan-row">
-            <span className={`bp-plan-name plan-${currentPlan}`}>{PLAN_META[currentPlan].label}</span>
-            <span className={`badge ${usage?.status ?? 'free'}`}>{subscriptionStatusLabel(usage)}</span>
+            <span className={`bp-plan-name plan-${currentPlan}`}>{locked ? 'No package' : planLabel(usage)}</span>
+            <span className={`badge ${locked ? 'expired' : usage?.status ?? 'expired'}`}>{subscriptionStatusLabel(usage)}</span>
           </div>
           <p className="bp-org">{orgName}</p>
           <dl className="bp-facts">
@@ -258,23 +267,23 @@ export default function Billing() {
           </dl>
 
           <div className="bp-actions">
-            {currentPlan === 'free' ? (
+            {!isPaid ? (
               <button type="button" onClick={() => cardsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                Upgrade plan
+                {locked ? 'Choose a package' : 'See packages'}
               </button>
             ) : (
               <>
                 {!usage?.cancel_at_period_end && (
                   <button type="button" className="secondary" disabled={busy}
                     onClick={() => runRpc('request_cancel_subscription', "Got it — your plan won't renew. You keep access until the period ends.",
-                      `Cancel your ${PLAN_META[currentPlan].label} subscription?\n\nYou'll keep ${PLAN_META[currentPlan].label} access until ${fmtDate(usage?.current_period_end)}, then the office moves to Free.`)}>
+                      `Cancel your ${planLabel(usage)} subscription?\n\nYou'll keep access until ${fmtDate(usage?.current_period_end)}, then the office is locked until you pick a package again.`)}>
                     Cancel subscription
                   </button>
                 )}
                 <button type="button" className="danger" disabled={busy}
-                  onClick={() => runRpc('downgrade_to_free_now', "You're on the Free plan now.",
-                    'Downgrade to Free right now? Nothing is deleted, but usage is capped at Free limits immediately.')}>
-                  Downgrade to Free now
+                  onClick={() => runRpc('downgrade_to_free_now', 'Your office is now locked until you pick a package.',
+                    'End your subscription right now? The office locks immediately — members can\'t sign in until an admin picks a package. Nothing is deleted.')}>
+                  Cancel now
                 </button>
               </>
             )}
@@ -296,7 +305,7 @@ export default function Billing() {
           {usage && seatState(usage.member_count, usage.max_members).near && (
             <p className={`bp-seat-note ${seatState(usage.member_count, usage.max_members).atLimit ? 'at' : ''}`}>
               {seatState(usage.member_count, usage.max_members).atLimit
-                ? `Member limit reached — your ${PLAN_META[currentPlan].label} plan supports up to ${usage.max_members}.`
+                ? `Member limit reached — your ${planLabel(usage)} package supports up to ${usage.max_members}.`
                 : `You're using ${usage.member_count} of ${usage.max_members} member seats.`}
             </p>
           )}
@@ -329,8 +338,7 @@ export default function Billing() {
           const meta = PLAN_META[plan]
           const isCurrent = currentPlan === plan
           const mobileOrder = isCurrent ? 0 : plan === 'growth' ? 1 : 2 + PLAN_ORDER.indexOf(plan)
-          const monthly = pl.price_monthly_kobo === 0
-          const yearMode = cycle === 'yearly' && !monthly
+          const yearMode = cycle === 'yearly'
           const shownKobo = yearMode ? pl.price_yearly_kobo : pl.price_monthly_kobo
           const saveKobo = annualSavingsKobo(pl)
 
@@ -348,7 +356,7 @@ export default function Billing() {
               <p className="pc-tagline">{meta.tagline}</p>
 
               <div className="pc-price">
-                <span className="pc-amt">{monthly ? '₦0' : nairaFromKobo(shownKobo)}</span>
+                <span className="pc-amt">{nairaFromKobo(shownKobo)}</span>
                 <span className="pc-per">/ {yearMode ? 'year' : 'month'}</span>
               </div>
               {yearMode ? (
@@ -356,8 +364,6 @@ export default function Billing() {
                   Equivalent to {monthlyEquivalent(pl.price_yearly_kobo)}
                   {saveKobo > 0 && <> · <strong>save {nairaFromKobo(saveKobo)}/year</strong></>}
                 </p>
-              ) : monthly ? (
-                <p className="pc-price-sub">Always free</p>
               ) : (
                 <p className="pc-price-sub">{nairaFromKobo(pl.price_yearly_kobo)}/year · {monthsFreeLabel(pl)}</p>
               )}
@@ -371,15 +377,13 @@ export default function Billing() {
               <div className="pc-cta">
                 {isCurrent ? (
                   <button type="button" className="secondary" disabled>Current plan</button>
-                ) : plan === 'free' ? (
-                  <button type="button" className="secondary" disabled={busy}
-                    onClick={() => runRpc('downgrade_to_free_now', "You're on the Free plan now.",
-                      'Move to the Free plan now? Usage is capped at Free limits immediately.')}>
-                    Switch to Free
-                  </button>
                 ) : (
                   <button type="button" onClick={() => handleUpgrade(plan)} disabled={checkoutPlan === plan}>
-                    {checkoutPlan === plan ? 'Opening checkout…' : `Upgrade to ${meta.label}`}
+                    {checkoutPlan === plan
+                      ? 'Opening checkout…'
+                      : isPaid
+                        ? `Switch to ${meta.label}`
+                        : `Choose ${meta.label}`}
                   </button>
                 )}
               </div>

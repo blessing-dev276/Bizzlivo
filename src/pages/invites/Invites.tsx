@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/AuthContext'
 import { useOrgUsage } from '../../lib/plans'
-import { PLAN_META, seatState } from '../../lib/entitlements'
+import { planLabel as planName, seatState } from '../../lib/entitlements'
 import type { Invite, MembershipRole, PendingMember, Profile } from '../../types/database'
 
 const INVITE_EXPIRY_DAYS = 7
@@ -367,7 +367,7 @@ export default function Invites() {
   const drawerStats = drawerMember ? statsByMember.get(drawerMember.profile.id) : null
 
   const seats = seatState(usage?.member_count ?? members.length, usage?.max_members ?? null)
-  const planLabel = usage ? PLAN_META[usage.plan].label : ''
+  const planLabel = usage ? planName(usage) : ''
 
   return (
     <div className="page">

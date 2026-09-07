@@ -266,6 +266,39 @@ label {
   width: 100%;
   margin-top: 8px;
 }
+.auth-card > button[type='button'] {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* password field with a show/hide toggle */
+.pw-field {
+  position: relative;
+  display: block;
+}
+.pw-field input {
+  width: 100%;
+  padding-right: 62px;
+}
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--line-soft);
+  color: var(--text-dim);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pw-toggle:hover:not(:disabled) {
+  color: var(--text-h);
+  filter: none;
+}
 
 /* ===== Theme toggle ===== */
 .theme-toggle {
@@ -998,6 +1031,36 @@ td {
   flex: 1;
   min-width: 160px;
 }
+
+/* searchable dropdown (e.g. the bank picker on Add payout account) */
+.combo-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.combo-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 9px 12px;
+  font-weight: 500;
+  color: var(--text-h);
+  cursor: pointer;
+}
+.combo-item:hover { background: var(--line-soft); filter: none; }
+.combo-empty { padding: 9px 12px; color: var(--text-faint); font-size: 13px; }
 
 .toggle-row {
   display: flex;

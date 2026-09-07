@@ -4,6 +4,54 @@ import { seedDefaultRanks } from './businessPath'
 
 const UNIQUE_VIOLATION = '23505'
 
+export interface RequestOfficeSignupInput {
+  fullName: string
+  officeName: string
+  email: string
+  password: string
+}
+
+export type RequestOfficeSignupResult =
+  | { ok: true }
+  | { ok: false; error: string; code?: 'already_confirmed' | 'email_failed' }
+
+/**
+ * Kicks off an office signup via the `office-signup` edge function, which
+ * creates the account unconfirmed and sends a Bizzlivo-branded confirmation
+ * email (not Supabase's default one). The org itself is still created on the
+ * first login after confirming — see `completeOfficeSignup`.
+ */
+export async function requestOfficeSignup(
+  input: RequestOfficeSignupInput,
+): Promise<RequestOfficeSignupResult> {
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : undefined
+  const { data, error } = await supabase.functions.invoke('office-signup', {
+    body: { ...input, siteUrl },
+  })
+
+  if (error) {
+    let message = 'We could not start your signup. Please try again.'
+    // Non-2xx responses land here; the JSON body carries the real reason.
+    const ctx = (error as { context?: Response }).context
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = await ctx.json()
+        if (body?.error) message = String(body.error)
+      } catch {
+        /* keep the generic message */
+      }
+    }
+    return { ok: false, error: message }
+  }
+
+  if (data?.ok) return { ok: true }
+  return {
+    ok: false,
+    error: data?.error ?? 'Something went wrong. Please try again.',
+    code: data?.code,
+  }
+}
+
 /**
  * Creates the profile/organization/membership rows for a brand-new signup.
  *
@@ -73,12 +121,12 @@ export async function completeOfficeSignup(user: User): Promise<string | null> {
     // ignored — see comment above
   }
 
-  // Best-effort: a brand-new office gets a 14-day Growth-tier trial with no
+  // Best-effort: a brand-new office gets a 30-day Growth-tier trial with no
   // card required. start_trial() is idempotent (a no-op if a subscription
   // row already exists), matching this function's own resumability — safe
   // to call every time completeOfficeSignup runs. Not fatal if it fails;
-  // the org just starts on Free instead of trialing, which the RPC can
-  // reasonably be retried on a later login.
+  // the org just starts unlocked-but-untracked until the RPC is retried on
+  // a later login, after which the trial clock and the eventual lock apply.
   try {
     await supabase.rpc('start_trial', { target_org_id: orgId })
   } catch {

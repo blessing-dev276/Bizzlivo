@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { trialDaysLeft, useOrgUsage } from '../../lib/plans'
-import { PLAN_META } from '../../lib/entitlements'
+import { planLabel as planName } from '../../lib/entitlements'
 
 export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: string | undefined; canManageBilling: boolean }) {
   const { usage } = useOrgUsage(orgId)
@@ -8,8 +8,8 @@ export default function WorkplaceFooter({ orgId, canManageBilling }: { orgId: st
   const isTopTier = usage?.plan === 'business' && usage.status !== 'trialing'
   const planLabel = usage
     ? usage.status === 'trialing' && daysLeft !== null
-      ? `Growth trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
-      : PLAN_META[usage.plan].label
+      ? `Trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
+      : planName(usage)
     : '—'
 
   return (

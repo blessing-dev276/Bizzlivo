@@ -117,12 +117,18 @@ export default function GenerateQuestions() {
       </div>
 
       {usage && (() => {
-        const generationsLeft = Math.max(0, usage.ai_exam_generations_per_month - usage.ai_exam_generations_used)
-        const questionsLeft = Math.max(0, usage.ai_questions_per_month - usage.ai_questions_used)
+        // null quota = unlimited (Business package).
+        const genCap = usage.ai_exam_generations_per_month
+        const qCap = usage.ai_questions_per_month
+        if (genCap == null && qCap == null) {
+          return <p className="limit-note" style={{ marginBottom: 16 }}>Unlimited AI generations on your package.</p>
+        }
+        const generationsLeft = genCap == null ? Infinity : Math.max(0, genCap - usage.ai_exam_generations_used)
+        const questionsLeft = qCap == null ? Infinity : Math.max(0, qCap - usage.ai_questions_used)
         const overBudget = generationsLeft === 0 || count > questionsLeft
         return (
           <p className={`limit-note ${overBudget ? 'attn' : ''}`} style={{ marginBottom: 16 }}>
-            {generationsLeft} of {usage.ai_exam_generations_per_month} monthly AI generations left · {questionsLeft} of {usage.ai_questions_per_month} monthly AI questions left
+            {genCap == null ? 'Unlimited' : `${generationsLeft} of ${genCap}`} monthly AI generations left · {qCap == null ? 'Unlimited' : `${questionsLeft} of ${qCap}`} monthly AI questions left
             {overBudget && <> · <Link to="/settings/billing">Upgrade for more →</Link></>}
           </p>
         )
@@ -137,7 +143,10 @@ export default function GenerateQuestions() {
 
       <button
         onClick={handleGenerate}
-        disabled={generating || (!!usage && (usage.ai_exam_generations_used >= usage.ai_exam_generations_per_month || count > usage.ai_questions_per_month - usage.ai_questions_used))}
+        disabled={generating || (!!usage && (
+          (usage.ai_exam_generations_per_month != null && usage.ai_exam_generations_used >= usage.ai_exam_generations_per_month) ||
+          (usage.ai_questions_per_month != null && count > usage.ai_questions_per_month - usage.ai_questions_used)
+        ))}
       >
         {generating ? 'Generating with AI…' : `Generate ${count} question${count === 1 ? '' : 's'}`}
       </button>

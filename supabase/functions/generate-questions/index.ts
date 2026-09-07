@@ -150,15 +150,16 @@ Deno.serve(async (req) => {
       const generationsUsed = usageRows?.length ?? 0
       const questionsUsed = (usageRows ?? []).reduce((sum, r) => sum + r.question_count, 0)
 
-      if (generationsUsed >= limits.ai_exam_generations_per_month) {
+      // null cap = unlimited (Business package).
+      if (limits.ai_exam_generations_per_month != null && generationsUsed >= limits.ai_exam_generations_per_month) {
         return jsonResponse({
-          error: `You've used all ${limits.ai_exam_generations_per_month} AI exam generations included this month on your current plan. Upgrade for more, or wait until next month.`,
+          error: `You've used all ${limits.ai_exam_generations_per_month} AI exam generations included this month on your current package. Upgrade for more, or wait until next month.`,
         }, 403)
       }
-      if (questionsUsed + numQuestions > limits.ai_questions_per_month) {
+      if (limits.ai_questions_per_month != null && questionsUsed + numQuestions > limits.ai_questions_per_month) {
         const remaining = Math.max(0, limits.ai_questions_per_month - questionsUsed)
         return jsonResponse({
-          error: `Generating ${numQuestions} questions would go over your plan's monthly AI question budget (${questionsUsed}/${limits.ai_questions_per_month} used, ${remaining} left). Generate fewer, or upgrade your plan.`,
+          error: `Generating ${numQuestions} questions would go over your package's monthly AI question budget (${questionsUsed}/${limits.ai_questions_per_month} used, ${remaining} left). Generate fewer, or upgrade your package.`,
         }, 403)
       }
     }

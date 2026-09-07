@@ -363,6 +363,30 @@ export function renderTemplate(type: string, data: Data): RenderResult {
       }
     }
 
+    case 'account_confirm': {
+      const officeName = escapeHtml(data.office_name || 'your office')
+      const body =
+        `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3a4250;">` +
+        `Hi ${escapeHtml(data.recipient_name || 'there')}, thanks for setting up ` +
+        `<strong>${officeName}</strong> on Bizzlivo.</p>` +
+        `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3a4250;">` +
+        `Confirm this email address to activate your account. Once it's confirmed you can ` +
+        `log in and finish setting up your office.</p>`
+      return {
+        subject: subject || 'Confirm your email to finish creating your office',
+        html: baseLayout({
+          ...branding,
+          preheader: 'Confirm your email to activate your Bizzlivo account',
+          headline: headline || 'Confirm your email',
+          bodyHtml: body,
+          ctaLabel: 'Confirm email address',
+          ctaUrl: safeUrl(data.confirm_url as string),
+          footNote:
+            "If you didn't create a Bizzlivo office, you can ignore this email — no account will be activated.",
+        }),
+      }
+    }
+
     case 'super_admin_alert': {
       return {
         subject,
