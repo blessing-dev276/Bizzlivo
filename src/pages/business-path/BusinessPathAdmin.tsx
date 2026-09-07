@@ -150,6 +150,39 @@ export default function BusinessPathAdmin({ readOnly = false }: { readOnly?: boo
     await load(orgId)
   }
 
+  // Hard delete — only for a rank no member has ever reached or currently
+  // sits on. Once a rank has promotion history, deleting it would wipe that
+  // history and strand members, so we force Archive instead.
+  async function removeRank(rank: BusinessPathRank) {
+    if (!orgId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const [{ count: reached }, { count: onRank }] = await Promise.all([
+        supabase.from('member_rank_history').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('rank_id', rank.id),
+        supabase.from('member_rank_progress').select('user_id', { count: 'exact', head: true }).eq('org_id', orgId).eq('current_rank_id', rank.id),
+      ])
+      if ((reached ?? 0) > 0 || (onRank ?? 0) > 0) {
+        setError(`"${rank.name}" can't be deleted — members have reached or are currently on it. Archive it instead so their rank history stays intact.`)
+        setBusy(false)
+        return
+      }
+      const c = counts.get(rank.id) ?? { learning: 0, task: 0 }
+      const items = c.learning + c.task
+      const itemNote = items > 0 ? ` Its ${items} path item${items === 1 ? '' : 's'} will be deleted too.` : ''
+      if (!confirm(`Delete "${rank.name}" permanently?${itemNote} This can't be undone.`)) {
+        setBusy(false)
+        return
+      }
+      const { error: e } = await supabase.from('business_path_ranks').delete().eq('id', rank.id)
+      if (e) throw e
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete this rank.')
+    }
+    setBusy(false)
+    await load(orgId)
+  }
+
   if (loading) return <div className="page bp"><div className="bp-head"><h1>Business Path</h1></div><p className="md-muted">Loading…</p></div>
 
   const sorted = [...ranks].sort((a, b) => a.order_index - b.order_index)
@@ -223,9 +256,14 @@ export default function BusinessPathAdmin({ readOnly = false }: { readOnly?: boo
                   )}
                   <Link to={`/business-path/ranks/${rank.id}`} className="btn-primary-link">{readOnly ? 'View path →' : 'Manage Path →'}</Link>
                   {!readOnly && (
-                    <button type="button" className="btn-ghost" onClick={() => toggleActive(rank)}>
-                      {rank.is_active ? 'Archive' : 'Restore'}
-                    </button>
+                    <>
+                      <button type="button" className="btn-ghost" onClick={() => toggleActive(rank)}>
+                        {rank.is_active ? 'Archive' : 'Restore'}
+                      </button>
+                      <button type="button" className="btn-ghost bp-delete" onClick={() => removeRank(rank)} disabled={busy}>
+                        Delete
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
