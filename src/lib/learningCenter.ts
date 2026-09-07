@@ -179,6 +179,62 @@ export async function unmarkItem(userId: string, itemId: string) {
   return supabase.from('class_item_progress').delete().eq('user_id', userId).eq('item_id', itemId)
 }
 
+// ---- day-based drip release (0065) ----
+
+/**
+ * Idempotently records that the current member has started this section
+ * (their personal "Day 1") and returns the start date as 'YYYY-MM-DD'.
+ * Call it when the member opens the section.
+ */
+export async function startClass(classId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('start_class', { p_class: classId })
+  if (error) return null
+  return (data as string) ?? null
+}
+
+export interface ModuleLock {
+  locked: boolean
+  /** whole days until it unlocks (0 when already open) */
+  daysUntil: number
+  /** 'YYYY-MM-DD' the module unlocks, or null when not dripped */
+  unlocksOn: string | null
+}
+
+const OPEN: ModuleLock = { locked: false, daysUntil: 0, unlocksOn: null }
+
+/** UTC "today" as a YYYY-MM-DD string — matches the server's date math. */
+function utcToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Whether a module is unlocked for a member, mirroring the SQL
+ * class_module_unlocked(). Dates are UTC on both sides.
+ */
+export function moduleLock(dripEnabled: boolean, dripDay: number | null, startedOn: string | null): ModuleLock {
+  const day = dripDay ?? 1
+  if (!dripEnabled || day <= 1) return OPEN
+
+  const startStr = startedOn ?? (day > 1 ? null : utcToday())
+  if (!startStr) return { locked: true, daysUntil: day - 1, unlocksOn: null }
+
+  const unlock = new Date(startStr + 'T00:00:00Z')
+  unlock.setUTCDate(unlock.getUTCDate() + (day - 1))
+  const unlocksOn = unlock.toISOString().slice(0, 10)
+
+  const today = new Date(utcToday() + 'T00:00:00Z')
+  const daysUntil = Math.round((unlock.getTime() - today.getTime()) / 86_400_000)
+  return { locked: daysUntil > 0, daysUntil: Math.max(0, daysUntil), unlocksOn }
+}
+
+/** "Unlocks today/tomorrow/in N days" copy for a locked module. */
+export function unlockLabel(lock: ModuleLock): string {
+  if (!lock.locked) return ''
+  if (lock.daysUntil <= 0) return 'Unlocks today'
+  if (lock.daysUntil === 1) return 'Unlocks tomorrow'
+  return `Unlocks in ${lock.daysUntil} days`
+}
+
 // ---- area overview for the member Learning Center home ----
 export interface AreaOverview {
   key: LearningArea

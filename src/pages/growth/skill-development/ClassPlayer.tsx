@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/AuthContext'
 import { KIND_ICON } from '../../../lib/resourceKind'
 import { notifyUsers } from '../../../lib/notifications'
+import { moduleLock, startClass, unlockLabel } from '../../../lib/learningCenter'
 import type {
   Attempt,
   ClassItemProgress,
@@ -56,6 +57,7 @@ export default function ClassPlayer() {
   const [submissions, setSubmissions] = useState<CourseworkSubmission[]>([])
   const [urls, setUrls] = useState<Map<string, string>>(new Map())
   const [openBody, setOpenBody] = useState<string | null>(null)
+  const [startedOn, setStartedOn] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +83,11 @@ export default function ClassPlayer() {
     const { data: moduleData } = await supabase.from('class_modules').select('*').eq('class_id', classId).order('order_index', { ascending: true })
     const moduleRows = (moduleData as ClassModule[]) ?? []
     setModules(moduleRows)
+
+    // Opening a drip-fed section is what starts the member's "Day 1".
+    if ((classData as SkillClass).drip_enabled) {
+      setStartedOn(await startClass(classId))
+    }
 
     const { data: trainerData } = await supabase
       .from('class_trainers')
@@ -278,10 +285,22 @@ export default function ClassPlayer() {
         {modules.length === 0 ? (
           <p className="empty-row">This class doesn't have any modules yet.</p>
         ) : (
-          modules.map((mod) => (
-            <div className="res-card" key={mod.id} style={{ marginBottom: 14 }}>
-              <div className="res-title-block"><h3>{mod.title}</h3></div>
+          modules.map((mod) => {
+            const lock = moduleLock(!!classInfo.drip_enabled, mod.drip_day, startedOn)
+            return (
+            <div className={`res-card ${lock.locked ? 'is-locked' : ''}`} key={mod.id} style={{ marginBottom: 14 }}>
+              <div className="res-title-block" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3>{mod.title}</h3>
+                {lock.locked && <span className="badge">🔒 {unlockLabel(lock)}</span>}
+              </div>
 
+              {lock.locked ? (
+                <p className="empty-row" style={{ marginTop: 10 }}>
+                  {lock.unlocksOn
+                    ? `This module opens on ${new Date(lock.unlocksOn + 'T00:00:00Z').toLocaleDateString()}. Keep going with what's already unlocked.`
+                    : 'This module unlocks on a later day of the path.'}
+                </p>
+              ) : (
               <div style={{ marginTop: 10 }}>
                 {(itemsByModule.get(mod.id) ?? []).length === 0 ? (
                   <p className="empty-row">Nothing in this module yet.</p>
@@ -366,8 +385,10 @@ export default function ClassPlayer() {
                   })
                 )}
               </div>
+              )}
             </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

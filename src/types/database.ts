@@ -475,6 +475,7 @@ export interface SkillClass {
   purpose: ClassPurpose | null
   area: LearningArea | null
   section_order: number
+  drip_enabled: boolean
   created_by: string
   created_at: string
 }
@@ -487,6 +488,15 @@ export interface ClassModule {
   description: string | null
   status: 'draft' | 'published'
   order_index: number
+  drip_day: number | null
+  created_at: string
+}
+
+export interface ClassEnrollment {
+  org_id: string
+  class_id: string
+  user_id: string
+  started_on: string
   created_at: string
 }
 

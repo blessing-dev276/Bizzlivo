@@ -347,6 +347,25 @@ export default function ClassEditor() {
     else await load()
   }
 
+  async function toggleDrip() {
+    if (!classInfo) return
+    setBusy(true)
+    const { error: e } = await supabase
+      .from('classes')
+      .update({ drip_enabled: !classInfo.drip_enabled })
+      .eq('id', classInfo.id)
+    setBusy(false)
+    if (e) setError(e.message)
+    else await load()
+  }
+
+  async function setDripDay(mod: ClassModule, day: number) {
+    const value = Number.isFinite(day) && day >= 1 ? Math.floor(day) : null
+    setModules((ms) => ms.map((m) => (m.id === mod.id ? { ...m, drip_day: value } : m)))
+    const { error: e } = await supabase.from('class_modules').update({ drip_day: value }).eq('id', mod.id)
+    if (e) { setError(e.message); await load() }
+  }
+
   function resetNewResourceForm() {
     setShowNewResource(false)
     setNewResourceTitle('')
@@ -565,6 +584,27 @@ export default function ClassEditor() {
 
       <div className="res-card" style={{ marginTop: 16 }}>
         <div className="res-top">
+          <div className="res-title-block">
+            <h3>Drip-feed by day</h3>
+            <p style={{ color: 'var(--text-dim)', fontSize: 12.5, margin: '4px 0 0' }}>
+              Release modules on a schedule. A module's <strong>Day</strong> is how many days after a
+              member first opens this section it unlocks (Day 1 = immediately). Later days unlock on
+              time, whether or not earlier modules are finished.
+            </p>
+          </div>
+          <button type="button" className="secondary" onClick={toggleDrip} disabled={busy}>
+            {classInfo.drip_enabled ? 'Turn off' : 'Turn on'}
+          </button>
+        </div>
+        {classInfo.drip_enabled && (
+          <p className="empty-row" style={{ marginTop: 8 }}>
+            On — set each module's Day below. Modules with no Day (or Day 1) are open from the start.
+          </p>
+        )}
+      </div>
+
+      <div className="res-card" style={{ marginTop: 16 }}>
+        <div className="res-top">
           <div className="res-title-block"><h3>Trainers</h3></div>
           <button type="button" className="secondary" onClick={() => setShowTrainerPicker(true)}>+ Add trainer</button>
         </div>
@@ -640,7 +680,19 @@ export default function ClassEditor() {
               <div className="res-left">
                 <div className="res-title-block"><h3>{mod.title}</h3></div>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {classInfo.drip_enabled && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: 'var(--text-dim)' }}>
+                    Day
+                    <input
+                      type="number"
+                      min={1}
+                      value={mod.drip_day ?? 1}
+                      onChange={(e) => setDripDay(mod, Number(e.target.value))}
+                      style={{ width: 56 }}
+                    />
+                  </label>
+                )}
                 <button type="button" className="secondary" onClick={() => moveModule(mod, -1)} disabled={busy}>↑</button>
                 <button type="button" className="secondary" onClick={() => moveModule(mod, 1)} disabled={busy}>↓</button>
                 <button type="button" className="secondary" onClick={() => renameModule(mod)} disabled={busy}>Rename</button>

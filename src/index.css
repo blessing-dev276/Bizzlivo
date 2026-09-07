@@ -4725,3 +4725,6 @@ td {
 @media (max-width: 520px) {
   .lb-hide-sm { display: none; }
 }
+
+.res-card.is-locked { opacity: 0.6; }
+.res-card.is-locked h3 { color: var(--text-dim); }
