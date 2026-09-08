@@ -16,6 +16,11 @@ interface Row extends MemberMonthlyGoal {
   member_name: string
 }
 
+function progressText(g: MemberMonthlyGoal): string {
+  if (g.goal_type === 'binary') return g.done ? 'Complete' : 'Incomplete'
+  return `${formatValue(g.goal_type, g.progress_value, g.unit)} / ${formatValue(g.goal_type, g.target_value, g.unit)} (${goalPercent(g)}%)`
+}
+
 export default function GoalsReview() {
   const { currentMembership } = useAuth()
   const role = currentMembership?.role
@@ -57,6 +62,28 @@ export default function GoalsReview() {
   const visible = rows.filter(
     (r) => (!monthFilter || r.month === monthFilter) && (!statusFilter || r.status === statusFilter),
   )
+
+  // All Goals view: one section per member, members A→Z, submissions first.
+  const byMember = useMemo(() => {
+    const map = new Map<string, Row[]>()
+    for (const r of visible) {
+      const list = map.get(r.member_name) ?? []
+      list.push(r)
+      map.set(r.member_name, list)
+    }
+    return [...map.entries()]
+      .map(([name, goals]) => ({
+        name,
+        goals: [...goals].sort(
+          (a, b) =>
+            (b.status === 'submitted' ? 1 : 0) - (a.status === 'submitted' ? 1 : 0) ||
+            b.month.localeCompare(a.month) ||
+            b.created_at.localeCompare(a.created_at),
+        ),
+        awaiting: goals.filter((g) => g.status === 'submitted').length,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [visible])
 
   if (role !== 'admin' && role !== 'team_leader') return <Navigate to="/" replace />
 
@@ -108,7 +135,7 @@ export default function GoalsReview() {
         <p className="empty-row">Loading…</p>
       ) : visible.length === 0 ? (
         <p className="empty-row">{tab === 'queue' ? 'No submissions awaiting review.' : 'No goals match.'}</p>
-      ) : (
+      ) : tab === 'queue' ? (
         <div className="rp-table-wrap">
           <table className="rp-table">
             <thead>
@@ -120,17 +147,45 @@ export default function GoalsReview() {
                   <td>{g.member_name}</td>
                   <td>{g.category && <span aria-hidden>{CATEGORY_META[g.category].icon} </span>}{g.title}</td>
                   <td className="rp-dim">{monthLabelOf(g.month)}</td>
-                  <td className="rp-dim">
-                    {g.goal_type === 'binary'
-                      ? (g.done ? 'Complete' : 'Incomplete')
-                      : `${formatValue(g.goal_type, g.progress_value, g.unit)} / ${formatValue(g.goal_type, g.target_value, g.unit)} (${goalPercent(g)}%)`}
-                  </td>
+                  <td className="rp-dim">{progressText(g)}</td>
                   <td><span className={`gl-tag ${STATUS_META[g.status].tone}`}>{STATUS_META[g.status].label}</span></td>
-                  <td><button className="gl-btn ghost sm" onClick={() => setOpenId(g.id)}>{g.status === 'submitted' ? 'Review' : 'View'}</button></td>
+                  <td><button className="gl-btn ghost sm" onClick={() => setOpenId(g.id)}>Review</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="gl-mgroups">
+          {byMember.map((m) => (
+            <div className="gl-mgroup" key={m.name}>
+              <div className="gl-mgroup-head">
+                <strong>{m.name}</strong>
+                <span className="gl-mgroup-meta">
+                  {m.goals.length} goal{m.goals.length === 1 ? '' : 's'}
+                  {m.awaiting > 0 && <span className="gl-tag amber" style={{ marginLeft: 8 }}>{m.awaiting} to review</span>}
+                </span>
+              </div>
+              <div className="rp-table-wrap">
+                <table className="rp-table">
+                  <thead>
+                    <tr><th>Goal</th><th>Period</th><th>Progress</th><th>Status</th><th /></tr>
+                  </thead>
+                  <tbody>
+                    {m.goals.map((g) => (
+                      <tr key={g.id}>
+                        <td>{g.category && <span aria-hidden>{CATEGORY_META[g.category].icon} </span>}{g.title}</td>
+                        <td className="rp-dim">{monthLabelOf(g.month)}</td>
+                        <td className="rp-dim">{progressText(g)}</td>
+                        <td><span className={`gl-tag ${STATUS_META[g.status].tone}`}>{STATUS_META[g.status].label}</span></td>
+                        <td><button className="gl-btn ghost sm" onClick={() => setOpenId(g.id)}>{g.status === 'submitted' ? 'Review' : 'View'}</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

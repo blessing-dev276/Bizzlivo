@@ -141,13 +141,15 @@ export default function MonthlyGoals() {
 
       {!loading && goals.length > 0 && (
         <div className="gl-summary">
-          <div><span className="gl-sm-v">{summary.total}</span><span className="gl-sm-l">Goals</span></div>
-          <div><span className="gl-sm-v">{summary.approved}</span><span className="gl-sm-l">Approved</span></div>
-          <div><span className="gl-sm-v">{summary.inProgress}</span><span className="gl-sm-l">In Progress</span></div>
-          <div><span className="gl-sm-v">{summary.awaiting}</span><span className="gl-sm-l">Awaiting Review</span></div>
+          <div className="gl-sm-tile"><span className="gl-sm-v">{summary.total}</span><span className="gl-sm-l">Goals</span></div>
+          <div className="gl-sm-tile ok"><span className="gl-sm-v">{summary.approved}</span><span className="gl-sm-l">Approved</span></div>
+          <div className="gl-sm-tile blue"><span className="gl-sm-v">{summary.inProgress}</span><span className="gl-sm-l">In Progress</span></div>
+          <div className="gl-sm-tile amber"><span className="gl-sm-v">{summary.awaiting}</span><span className="gl-sm-l">Awaiting Review</span></div>
           <div className="gl-sm-overall">
-            <span className="gl-sm-l">Overall Progress</span>
-            <span className="gl-sm-v">{summary.overall}%</span>
+            <div className="gl-sm-overall-top">
+              <span className="gl-sm-l">Overall Progress</span>
+              <span className="gl-sm-v">{summary.overall}%</span>
+            </div>
             <span className="gl-sm-bar"><span style={{ width: `${summary.overall}%` }} /></span>
           </div>
         </div>
@@ -201,8 +203,9 @@ function GoalRow({ goal, onOpen }: { goal: MemberMonthlyGoal; onOpen: () => void
   const pctv = goalPercent(goal)
   const cat = goal.category ? CATEGORY_META[goal.category] : null
   const st = STATUS_META[goal.status]
+  const done = goal.goal_type === 'binary' ? goal.done : pctv >= 100
   return (
-    <button type="button" className="gl-row" onClick={onOpen}>
+    <button type="button" className={`gl-row tone-${st.tone}`} onClick={onOpen}>
       <span className="gl-row-icon" aria-hidden>{cat?.icon ?? '•'}</span>
       <span className="gl-row-main">
         <span className="gl-row-title">
@@ -210,18 +213,18 @@ function GoalRow({ goal, onOpen }: { goal: MemberMonthlyGoal; onOpen: () => void
           {goal.title}
         </span>
         <span className="gl-row-sub">
-          {cat?.label ?? 'Uncategorised'}
-          {goal.auto_source && ' · Auto-tracked'}
-          {goal.due_date && ` · Due ${new Date(goal.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+          <span className={cat ? '' : 'gl-row-uncat'}>{cat?.label ?? 'Uncategorised'}</span>
+          {goal.auto_source && <> · <span>⚡ Auto-tracked</span></>}
+          {goal.due_date && <> · Due {new Date(goal.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</>}
         </span>
       </span>
       <span className="gl-row-prog">
         <span className="gl-row-vals">
           {goal.goal_type === 'binary'
             ? (goal.done ? 'Complete' : 'Incomplete')
-            : `${formatValue(goal.goal_type, goal.progress_value, goal.unit)} / ${formatValue(goal.goal_type, goal.target_value, goal.unit)}`}
+            : <>{formatValue(goal.goal_type, goal.progress_value, goal.unit)} / {formatValue(goal.goal_type, goal.target_value, goal.unit)} <span className="gl-row-pct">{pctv}%</span></>}
         </span>
-        <span className="gl-row-bar"><span style={{ width: `${pctv}%` }} /></span>
+        <span className="gl-row-bar"><span className={done ? 'done' : ''} style={{ width: `${Math.max(pctv, 2)}%` }} /></span>
       </span>
       <span className={`gl-tag ${st.tone}`}>{st.label}</span>
     </button>
