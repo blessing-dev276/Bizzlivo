@@ -232,9 +232,9 @@ function KPI({ label, value, sub }: { label: string; value: React.ReactNode; sub
   )
 }
 function Tag({ s }: { s: string }) { return <span className={`gl-tag ${STATUS_TONE(s)}`}>{s}</span> }
-function Panel({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+function Panel({ title, children, action, className = '' }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
-    <section className="pl-panel">
+    <section className={`pl-panel ${className}`}>
       <div className="pl-panel-head"><h2>{title}</h2>{action}</div>
       {children}
     </section>
@@ -515,7 +515,7 @@ function OrgDetail({ isSuper }: { isSuper: boolean }) {
           </Panel>
 
           {isSuper && (
-            <Panel title="Danger zone">
+            <Panel title="Danger zone" className="pl-danger-zone">
               <PurgeOrgAction
                 slug={String(org.slug)}
                 name={String(org.name)}

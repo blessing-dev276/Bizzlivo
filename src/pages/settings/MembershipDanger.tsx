@@ -55,17 +55,21 @@ export default function MembershipDanger() {
   }
 
   return (
-    <section className="set-card" style={{ borderColor: 'var(--danger, #dc2626)', marginTop: 32 }}>
-      <div className="set-card-head">
-        <h2 style={{ color: 'var(--danger, #dc2626)' }}>Danger zone</h2>
-        <p>Leaving removes your access to this office. {isAdmin ? 'Deleting closes it for everyone.' : ''}</p>
+    <section className="set-card danger-zone">
+      <div className="danger-zone-head">
+        <div className="danger-zone-mark" aria-hidden="true">!</div>
+        <div className="set-card-head">
+          <span className="danger-zone-eyebrow">Account access</span>
+          <h2>Danger zone</h2>
+          <p>These actions affect your access to {org.name}. {isAdmin ? 'Deleting closes the office for everyone.' : ''}</p>
+        </div>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       {/* ---- Leave ---- */}
-      <div className="set-danger-row">
-        <div>
+      <div className={`set-danger-row ${mode === 'leave' ? 'is-open' : ''}`}>
+        <div className="danger-action-copy">
           <strong>Leave this office</strong>
           <span className="set-hint">
             You lose access to {org.name}. An admin can invite you back later.
@@ -81,7 +85,7 @@ export default function MembershipDanger() {
             </button>
           </span>
         ) : (
-          <button type="button" className="btn-danger" onClick={() => { setMode('leave'); setError(null) }}>
+            <button type="button" className="btn-danger" onClick={() => { setMode('leave'); setError(null) }}>
             Leave office
           </button>
         )}
@@ -89,8 +93,8 @@ export default function MembershipDanger() {
 
       {/* ---- Delete (admin only) ---- */}
       {isAdmin && (
-        <div className="set-danger-row" style={{ marginTop: 16 }}>
-          <div>
+        <div className={`set-danger-row ${mode === 'delete' ? 'is-open' : ''}`}>
+          <div className="danger-action-copy">
             <strong>Delete this office</strong>
             <span className="set-hint">
               Closes {org.name} for every member. Data is retained and the office can be restored by support.
