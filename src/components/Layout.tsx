@@ -155,7 +155,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/', icon: I.dashboard, label: 'Dashboard', end: true },
       { to: '/training', icon: I.learning, label: 'Learning Center' },
-      { to: '/business-path', icon: I.path, label: 'Business Path' },
     ],
   },
   {
@@ -174,17 +173,22 @@ const NAV_SECTIONS: NavSection[] = [
         ],
       },
       { to: '/my-team', icon: I.network, label: 'My Network', show: (c) => !(c.isAdmin || c.isManager) },
+      { to: '/business-path', icon: I.path, label: 'Business Path' },
+      // Team leaders keep the personal + review group. Admins have no
+      // personal goals — they review member goals from a member's profile
+      // and get the review queue as a standalone item below.
       {
         group: true,
         icon: I.goals,
         label: 'My Goals',
         paths: ['/goals'],
-        show: (c) => c.canReviewGoals,
+        show: (c) => c.canReviewGoals && !c.isManager,
         children: [
           { to: '/goals', icon: I.goals, label: 'Overview', end: true },
           { to: '/goals/review', icon: I.reports, label: 'Goal Reviews' },
         ],
       },
+      { to: '/goals/review', icon: I.reports, label: 'Goal Reviews', show: (c) => c.isManager },
       { to: '/goals', icon: I.goals, label: 'My Goals', show: (c) => !c.canReviewGoals },
       // Admins have no wallet of their own — they manage member earnings in Finance.
       { to: '/wallet', icon: I.wallet, label: 'My Wallet', show: (c) => !c.isManager },
