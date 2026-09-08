@@ -299,7 +299,7 @@ export default function MemberHome() {
       <section className="md-hero mrk-hero">
         <div className="mrk-hero-main">
           <h1>{timeOfDayGreeting(now)}, {firstName} 👋</h1>
-          <p className="md-hero-sub">Your journey. Your goals. Your future.</p>
+          <p className="md-hero-sub">Your workspace. Your next step. Your momentum.</p>
         </div>
         <div className="mrk-hero-stats">
           <div><span className="mrk-cap">Current rank</span><strong>{cur.rank.name}</strong></div>
@@ -358,7 +358,7 @@ export default function MemberHome() {
 
           {focus && (
             <div className="mrk-focus">
-              <span className="mrk-cap">Current focus</span>
+              <span className="mrk-cap">Next milestone</span>
               <div className="mrk-focus-title">{focus.item.title}</div>
               {focus.item.instructions && <p className="md-muted">{focus.item.instructions}</p>}
               <p className="mrk-focus-status">{statusLabel(focus)}</p>
@@ -370,7 +370,7 @@ export default function MemberHome() {
           )}
 
           <div className="dash-card-head" style={{ marginTop: 18 }}>
-            <h2>Current rank requirements</h2>
+            <h2>Next milestones</h2>
             <div className="view-tabs" style={{ margin: 0, border: 'none' }}>
               {(['all', 'learning', 'task'] as const).map((f) => (
                 <button key={f} type="button" className={`view-tab ${reqFilter === f ? 'active' : ''}`} onClick={() => setReqFilter(f)}>
@@ -400,7 +400,7 @@ export default function MemberHome() {
         {/* ---- right rail: quick actions on top, then attention / goals / network ---- */}
         <div className="col-4 md-col">
           <section className="dash-card">
-            <div className="dash-card-head"><h2>Quick actions</h2></div>
+            <div className="dash-card-head"><h2>Shortcuts</h2></div>
             <div className="mrk-actions">
               <Link to="/business-path" className="mrk-action">Continue Business Path</Link>
               <Link to="/training" className="mrk-action">Open Learning Center</Link>
@@ -461,7 +461,7 @@ export default function MemberHome() {
         {/* ---- learning progress ---- */}
         <section className="dash-card col-12">
           <div className="dash-card-head">
-            <h2>Your learning</h2>
+            <h2>Learning progress</h2>
             <Link to="/training" className="dash-see-all">Open Learning Center →</Link>
           </div>
           {path.learningByArea.length === 0 ? (
@@ -485,7 +485,7 @@ export default function MemberHome() {
         {/* ---- upcoming ---- */}
         {upcoming.length > 0 && (
           <section className="dash-card col-4">
-            <div className="dash-card-head"><h2>Upcoming</h2></div>
+            <div className="dash-card-head"><h2>Upcoming deadlines</h2></div>
             <div className="mrk-up-list">
               {upcoming.slice(0, 5).map((u) => (
                 <Link to={u.href} className="mrk-up" key={u.key}>

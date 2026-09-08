@@ -3737,6 +3737,48 @@ td {
   .mrk-summary { flex-direction: column; align-items: flex-start; text-align: left; }
 }
 
+/* Member workspace polish — a quieter marketplace-style hierarchy. */
+.mdash.mrk { max-width: 1180px; gap: 16px; }
+.mdash.mrk .md-hero { padding: 26px 28px; border-radius: 18px; }
+.mdash.mrk .mrk-hero-main h1 { font-size: clamp(24px, 2.4vw, 31px); letter-spacing: -0.03em; }
+.mdash.mrk .mrk-hero-stats { gap: 26px; }
+.mdash.mrk .mrk-hero-stats strong { font-size: 15px; }
+.mdash.mrk .mrk-ladder { margin: 0; padding: 20px 16px 15px; border-radius: 14px; box-shadow: 0 12px 32px -26px rgba(0, 0, 0, 0.65); }
+.mdash.mrk .mrk-step { gap: 7px; }
+.mdash.mrk .mrk-step-orb { width: 48px; height: 48px; }
+.mdash.mrk .mrk-step-name { font-size: 12px; }
+.mdash.mrk .mrk-step-tag { font-size: 8.5px; padding: 2px 7px; }
+.mdash.mrk .ac-card { border-color: color-mix(in srgb, var(--md-accent) 38%, var(--line)); box-shadow: 0 16px 40px -28px color-mix(in srgb, var(--md-accent) 65%, #000); }
+.mdash.mrk .ac-card .dash-card-head { margin-bottom: 4px; }
+.mdash.mrk .ac-card .dash-card-head h2 { font-size: 16px; }
+.mdash.mrk .ac-item { padding: 14px 4px; }
+.mdash.mrk .ac-title { font-size: 13px; }
+.mdash.mrk .ac-cta { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 24%, var(--line)); color: var(--accent); }
+.mdash.mrk .dash-grid { gap: 16px; }
+.mdash.mrk .dash-card { border-radius: 14px; box-shadow: 0 12px 34px -28px rgba(0, 0, 0, 0.7); }
+.mdash.mrk .dash-card:hover { transform: translateY(-2px); }
+.mdash.mrk .mrk-summary { gap: 18px; padding-bottom: 18px; }
+.mdash.mrk .mrk-summary-body h2 { font-size: 22px; letter-spacing: -0.02em; }
+.mdash.mrk .mrk-focus { margin-top: 14px; padding: 14px 16px; }
+.mdash.mrk .mrk-focus-title { font-size: 15px; }
+.mdash.mrk .dash-card-head { margin-bottom: 12px; }
+.mdash.mrk .dash-card-head h2 { font-size: 15px; letter-spacing: -0.01em; }
+.mdash.mrk .mrk-action { padding: 11px 13px; font-size: 12.5px; }
+.mdash.mrk .mrk-learn { padding: 13px 14px; border-radius: 9px; }
+.mdash.mrk .mrk-learn-count { font-size: 12px; color: var(--text-dim); }
+.mdash.mrk .mrk-big { font-size: 17px; }
+.mdash.mrk .mrk-net > div { padding: 9px 0; }
+.mdash.mrk .mrk-up { padding: 10px 0; }
+
+@media (max-width: 640px) {
+  .mdash.mrk { gap: 12px; }
+  .mdash.mrk .md-hero { padding: 22px 18px; }
+  .mdash.mrk .mrk-hero-stats { gap: 13px 18px; }
+  .mdash.mrk .mrk-ladder { padding-inline: 10px; }
+  .mdash.mrk .ac-item { align-items: flex-start; }
+  .mdash.mrk .ac-cta { margin-left: 20px; }
+}
+
 /* ============================================================
    Reports & Insights (/reports) — the admin office-intelligence
    workspace. Token-based so light/dark both hold.
