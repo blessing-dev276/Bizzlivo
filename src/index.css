@@ -1989,12 +1989,12 @@ td {
 .billing-cycle-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 6px 0 20px; scroll-margin-top: 20px; }
 .provider-toggle { font-size: 0.9em; }
 .cycle-toggle { display: inline-flex; background: var(--line-soft); border: 1px solid var(--line); border-radius: 100px; padding: 4px; gap: 2px; }
-.cycle-toggle button {
-  display: inline-flex; align-items: center; gap: 8px;
+.cycle-toggle button, .cycle-toggle a {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
   background: transparent; color: var(--text-dim); font-size: 13px; padding: 8px 20px; border-radius: 100px; font-weight: 600;
 }
-.cycle-toggle button:hover:not(:disabled) { color: var(--text-h); filter: none; }
-.cycle-toggle button.active { background: var(--accent); color: var(--gold-ink); }
+.cycle-toggle button:hover:not(:disabled), .cycle-toggle a:hover { color: var(--text-h); filter: none; }
+.cycle-toggle button.active, .cycle-toggle a.active { background: var(--accent); color: var(--gold-ink); }
 .cycle-save {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.03em; text-transform: uppercase;
   background: color-mix(in srgb, var(--teal) 22%, transparent); color: var(--teal);

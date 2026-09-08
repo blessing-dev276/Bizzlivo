@@ -237,10 +237,8 @@ const NAV_SECTIONS: NavSection[] = [
           { to: '/settings/profile', icon: I.profile, label: 'Profile' },
           { to: '/settings/notifications', icon: I.megaphone, label: 'Notifications' },
           { to: '/settings/security', icon: I.settings, label: 'Account & Security' },
-          { to: '/settings/office', icon: I.myTeam, label: 'Office', show: (c) => c.isAdmin },
-          { to: '/settings/finance', icon: I.finance, label: 'Finance', show: (c) => c.isAdmin },
-          { to: '/settings/integrations', icon: I.events, label: 'Integrations', show: (c) => c.isAdmin },
-          { to: '/settings/billing', icon: I.wallet, label: 'Billing & Plan', show: (c) => c.isAdmin },
+          // Office / Finance / Integrations / Billing share one tabbed page.
+          { to: '/settings/office', icon: I.myTeam, label: 'Office settings', show: (c) => c.isAdmin },
         ],
       },
       { to: '/help', icon: I.help, label: 'Help & Support' },
