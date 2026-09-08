@@ -45,6 +45,11 @@
   --accent-bg: var(--gold-soft);
   --danger: var(--coral);
   --success: var(--teal);
+  /* .md-btn accent — global fallback so a solid .md-btn works outside the
+     member dashboard (Wallet, Finance Operations). .mdash re-declares the
+     same values scoped. */
+  --md-accent: #2f6bf0;
+  --md-accent-hi: #4f86f5;
 
   --font-display: 'Space Grotesk', sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
@@ -90,6 +95,15 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* While the theme toggle runs, suppress every transition so the recolour
+   is one instant paint instead of hundreds of concurrent animations. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
 }
 
 body {
@@ -2475,10 +2489,15 @@ td {
   margin-top: 16px;
 }
 .dash-skeleton-side { display: flex; flex-direction: column; gap: 16px; }
+.sk-stack { display: flex; flex-direction: column; gap: 10px; }
+.sk-row { display: flex; align-items: center; }
+.sk-row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sk-split { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; }
 @media (max-width: 860px) {
   .app-skeleton-side { display: none; }
   .app-skeleton-main { padding: 20px 18px; }
   .dash-skeleton-grid { grid-template-columns: 1fr; }
+  .sk-split { grid-template-columns: 1fr; }
 }
 
 /* layout */
