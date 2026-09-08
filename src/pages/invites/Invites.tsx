@@ -45,6 +45,11 @@ interface MemberStats {
   history: AttemptRow[]
 }
 
+interface MemberRankStats {
+  rank: string | null
+  progress: number | null
+}
+
 interface MemberTeam {
   teamName: string
   leaderName: string | null
@@ -78,6 +83,7 @@ export default function Invites() {
   const [members, setMembers] = useState<MemberRow[]>([])
   const [publishedExamCount, setPublishedExamCount] = useState(0)
   const [attemptsByUser, setAttemptsByUser] = useState<Map<string, AttemptRow[]>>(new Map())
+  const [rankStatsByUser, setRankStatsByUser] = useState<Map<string, MemberRankStats>>(new Map())
   const [teamsByUser, setTeamsByUser] = useState<Map<string, MemberTeam[]>>(new Map())
   const [invites, setInvites] = useState<Invite[]>([])
   const [pendingMembers, setPendingMembers] = useState<PendingMemberRow[]>([])
@@ -105,7 +111,7 @@ export default function Invites() {
 
   async function load() {
     if (!orgId) return
-    const [memberRes, examRes, attemptRes, inviteRes, pendingRes, groupRes] = await Promise.all([
+    const [memberRes, examRes, attemptRes, inviteRes, pendingRes, groupRes, rankRes, rankProgressRes] = await Promise.all([
       supabase.from('memberships').select('id, role, status, profile:profiles(*)').eq('org_id', orgId).eq('status', 'active'),
       supabase.from('exams').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'published'),
       supabase
@@ -123,6 +129,8 @@ export default function Invites() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false }),
       supabase.from('groups').select('id, name, leader:profiles!leader_id(full_name)').eq('org_id', orgId),
+      supabase.from('business_path_ranks').select('id, name').eq('org_id', orgId),
+      supabase.rpc('report_bp_progress', { p_org: orgId }),
     ])
 
     setMembers((memberRes.data as unknown as MemberRow[]) ?? [])
@@ -139,6 +147,18 @@ export default function Invites() {
       byUser.set(a.user_id, list)
     }
     setAttemptsByUser(byUser)
+
+    const rankNames = new Map(
+      ((rankRes.data as { id: string; name: string }[] | null) ?? []).map((rank) => [rank.id, rank.name]),
+    )
+    const rankStats = new Map<string, MemberRankStats>()
+    for (const row of (rankProgressRes.data as { user_id: string; rank_id: string; required_total: number; required_done: number }[] | null) ?? []) {
+      rankStats.set(row.user_id, {
+        rank: rankNames.get(row.rank_id) ?? null,
+        progress: row.required_total > 0 ? Math.round((row.required_done / row.required_total) * 100) : 0,
+      })
+    }
+    setRankStatsByUser(rankStats)
 
     setInvites((inviteData as Invite[]) ?? [])
     setPendingMembers((pendingData as unknown as PendingMemberRow[]) ?? [])
@@ -463,10 +483,11 @@ export default function Invites() {
         ) : (
           <div className="table-card">
             <div className="t-row t-head">
-              <div>NAME</div><div>EMAIL</div><div>ROLE</div><div>EXAMS COMPLETED</div><div>AVG SCORE</div><div>LAST ACTIVE</div>
+              <div>NAME</div><div>EMAIL</div><div>ROLE</div><div>RANK</div><div>RANK PROGRESS</div><div>LAST ACTIVE</div>
             </div>
             {members.map((m) => {
               const stats = statsByMember.get(m.profile.id)
+              const rankStats = rankStatsByUser.get(m.profile.id)
               return (
                 <button type="button" className="t-row t-body" key={m.id} onClick={() => setDrawerMember(m)}>
                   <div className="member-cell">
@@ -475,15 +496,11 @@ export default function Invites() {
                   </div>
                   <div className="cell-dim">{m.profile.email}</div>
                   <div className={`role-pill ${m.role === 'member' ? 'member-role' : ''}`}>{ROLE_LABEL[m.role]}</div>
-                  {stats && stats.completedCount > 0 ? (
-                    <div className="cell-dim">{stats.completedCount} / {publishedExamCount}</div>
-                  ) : (
-                    <div className="not-started">Not started</div>
-                  )}
-                  {stats && stats.avgScore !== null ? (
+                  <div className="cell-dim">{rankStats?.rank ?? 'Unranked'}</div>
+                  {rankStats?.progress !== null && rankStats?.progress !== undefined ? (
                     <div className="score-bar-wrap">
-                      <div className="score-bar"><div className="score-bar-fill" style={{ width: `${stats.avgScore}%` }} /></div>
-                      <span className="cell-dim">{stats.avgScore}%</span>
+                      <div className="score-bar"><div className="score-bar-fill" style={{ width: `${rankStats.progress}%` }} /></div>
+                      <span className="cell-dim">{rankStats.progress}%</span>
                     </div>
                   ) : (
                     <div className="cell-dim">—</div>
@@ -562,128 +579,124 @@ export default function Invites() {
       )}
 
       <div className={`drawer-overlay ${drawerMember ? 'open' : ''}`} onClick={() => setDrawerMember(null)} />
-      <div className={`drawer ${drawerMember ? 'open' : ''}`}>
-        {drawerMember && (
-          <>
-            <button type="button" className="drawer-close" onClick={() => setDrawerMember(null)}>✕</button>
-            <div className="drawer-head">
-              <div className="drawer-avatar" style={{ background: avatarGradient(drawerMember.profile.id) }}>
-                {initials(drawerMember.profile.full_name)}
-              </div>
-              <div>
-                <h3>{drawerMember.profile.full_name}</h3>
-                <p>{drawerMember.profile.email}</p>
-              </div>
-            </div>
+      <aside className={`drawer mdrawer ${drawerMember ? 'open' : ''}`} aria-hidden={!drawerMember}>
+        {drawerMember && (() => {
+          const p = drawerMember.profile
+          const teams = teamsByUser.get(p.id) ?? []
+          const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v}%`)
+          return (
+            <>
+              <button type="button" className="drawer-close" onClick={() => setDrawerMember(null)} aria-label="Close">✕</button>
 
-            <Link to={`/members/${drawerMember.profile.id}`} className="btn-primary-link" style={{ display: 'inline-block', marginBottom: 16 }}>
-              Open full member profile →
-            </Link>
-
-            <label style={{ maxWidth: 200 }}>
-              Role
-              {canEditRoles ? (
-                <select
-                  value={drawerMember.role}
-                  onChange={(e) => handleRoleChange(drawerMember, e.target.value as MembershipRole)}
-                  disabled={roleSaving}
-                >
-                  <option value="member">Member</option>
-                  <option value="trainer">Trainer</option>
-                  <option value="team_leader">Team Leader</option>
-                  <option value="admin">Admin</option>
-                </select>
-              ) : (
-                <div className="role-pill" style={{ marginTop: 6 }}>{ROLE_LABEL[drawerMember.role]}</div>
-              )}
-            </label>
-            {roleError && <p className="form-error">{roleError}</p>}
-
-            {canEditRoles && (
-              <div style={{ margin: '10px 0 4px' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>SPONSOR</div>
-                <div className="cycle-toggle" style={{ marginBottom: 8 }}>
-                  <button type="button" className={sponsorMode === 'member' ? 'active' : ''} onClick={() => setSponsorMode('member')}>
-                    Office member
-                  </button>
-                  <button type="button" className={sponsorMode === 'other' ? 'active' : ''} onClick={() => setSponsorMode('other')}>
-                    Outside the office
-                  </button>
+              <div className="mdrawer-id">
+                <div className="drawer-avatar mdrawer-av" style={{ background: avatarGradient(p.id) }}>
+                  {initials(p.full_name)}
                 </div>
-                {sponsorMode === 'member' ? (
-                  <select
-                    value={sponsorMemberId}
-                    onChange={(e) => setSponsorMemberId(e.target.value)}
-                    style={{ maxWidth: 240 }}
-                  >
-                    <option value="">Select a member…</option>
-                    {members
-                      .filter((m) => m.profile.id !== drawerMember.profile.id)
-                      .map((m) => (
-                        <option key={m.profile.id} value={m.profile.id}>{m.profile.full_name}</option>
-                      ))}
-                  </select>
-                ) : (
-                  <input
-                    value={sponsorName}
-                    onChange={(e) => setSponsorName(e.target.value)}
-                    placeholder="Sponsor's name"
-                    style={{ maxWidth: 240 }}
-                  />
-                )}
-                <div style={{ marginTop: 8 }}>
-                  <button type="button" onClick={saveSponsor} disabled={sponsorSaving}>
-                    {sponsorSaving ? 'Saving…' : 'Save sponsor'}
-                  </button>
-                </div>
-                {sponsorMsg && (
-                  <p className={sponsorMsg.type === 'error' ? 'form-error' : 'form-info'} style={{ marginTop: 6 }}>
-                    {sponsorMsg.text}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div style={{ margin: '10px 0 4px' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>TEAM</div>
-              {(() => {
-                const teams = teamsByUser.get(drawerMember.profile.id) ?? []
-                if (teams.length === 0) return <p style={{ fontSize: 13.5, color: 'var(--text-faint)', margin: 0 }}>Not on a team yet.</p>
-                return teams.map((t, idx) => (
-                  <p key={idx} style={{ fontSize: 13.5, margin: 0 }}>
-                    {t.teamName} <span style={{ color: 'var(--text-faint)' }}>· Team Leader: {t.leaderName ?? 'Unassigned'}</span>
-                  </p>
-                ))
-              })()}
-            </div>
-
-            <div className="drawer-kpis">
-              <div className="drawer-kpi"><div className="v">{drawerStats?.completedCount ?? 0}</div><div className="l">COMPLETED</div></div>
-              <div className="drawer-kpi"><div className="v">{drawerStats?.avgScore ?? '—'}{drawerStats?.avgScore !== null && drawerStats?.avgScore !== undefined ? '%' : ''}</div><div className="l">AVG SCORE</div></div>
-              <div className="drawer-kpi"><div className="v">{drawerStats?.passRate ?? '—'}{drawerStats?.passRate !== null && drawerStats?.passRate !== undefined ? '%' : ''}</div><div className="l">PASS RATE</div></div>
-            </div>
-            <div className="drawer-history">
-              <h4>EXAM HISTORY</h4>
-              {drawerStats && drawerStats.history.length > 0 ? (
-                drawerStats.history.map((a) => (
-                  <div className="history-row" key={a.id}>
-                    <div>
-                      <div className="hr-name">{a.exam?.title ?? 'Untitled exam'}</div>
-                      <div className="hr-date">{a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : ''}</div>
-                    </div>
-                    <div className="hr-right">
-                      <span className="hr-score">{a.score_percent}%</span>
-                      <span className={`badge ${a.passed ? 'passed' : 'failed'}`}>{a.passed ? 'PASS' : 'FAIL'}</span>
-                    </div>
+                <div className="mdrawer-idtext">
+                  <h3>{p.full_name}</h3>
+                  <p>{p.email}</p>
+                  <div className="mdrawer-idmeta">
+                    <span className="role-pill">{ROLE_LABEL[drawerMember.role]}</span>
+                    <Link to={`/members/${p.id}`} className="mdrawer-openlink">Full profile →</Link>
                   </div>
-                ))
-              ) : (
-                <p style={{ fontSize: 13, color: 'var(--text-faint)' }}>No exams taken yet.</p>
+                </div>
+              </div>
+
+              <div className="mdrawer-kpis">
+                <div className="mdrawer-kpi"><span className="v">{drawerStats?.completedCount ?? 0}</span><span className="l">Exams done</span></div>
+                <div className="mdrawer-kpi"><span className="v">{pct(drawerStats?.avgScore)}</span><span className="l">Avg score</span></div>
+                <div className="mdrawer-kpi"><span className="v">{pct(drawerStats?.passRate)}</span><span className="l">Pass rate</span></div>
+              </div>
+
+              {canEditRoles && (
+                <section className="mdrawer-card">
+                  <h4>Manage</h4>
+
+                  <div className="mdrawer-field">
+                    <label htmlFor="drw-role">Role</label>
+                    <select
+                      id="drw-role"
+                      value={drawerMember.role}
+                      onChange={(e) => handleRoleChange(drawerMember, e.target.value as MembershipRole)}
+                      disabled={roleSaving}
+                    >
+                      <option value="member">Member</option>
+                      <option value="trainer">Trainer</option>
+                      <option value="team_leader">Team Leader</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    {roleError && <p className="form-error sm">{roleError}</p>}
+                  </div>
+
+                  <div className="mdrawer-field">
+                    <label>Sponsor</label>
+                    <div className="mdrawer-seg">
+                      <button type="button" className={sponsorMode === 'member' ? 'on' : ''} onClick={() => setSponsorMode('member')}>Office member</button>
+                      <button type="button" className={sponsorMode === 'other' ? 'on' : ''} onClick={() => setSponsorMode('other')}>Outside office</button>
+                    </div>
+                    {sponsorMode === 'member' ? (
+                      <select value={sponsorMemberId} onChange={(e) => setSponsorMemberId(e.target.value)}>
+                        <option value="">Select a member…</option>
+                        {members.filter((m) => m.profile.id !== p.id).map((m) => (
+                          <option key={m.profile.id} value={m.profile.id}>{m.profile.full_name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={sponsorName} onChange={(e) => setSponsorName(e.target.value)} placeholder="Sponsor's name" />
+                    )}
+                    <button type="button" className="mdrawer-save" onClick={saveSponsor} disabled={sponsorSaving}>
+                      {sponsorSaving ? 'Saving…' : 'Save sponsor'}
+                    </button>
+                    {sponsorMsg && (
+                      <p className={`${sponsorMsg.type === 'error' ? 'form-error' : 'form-info'} sm`}>{sponsorMsg.text}</p>
+                    )}
+                  </div>
+                </section>
               )}
-            </div>
-          </>
-        )}
-      </div>
+
+              <section className="mdrawer-card">
+                <h4>Team</h4>
+                {teams.length === 0 ? (
+                  <p className="mdrawer-muted">Not on a team yet.</p>
+                ) : (
+                  teams.map((t, i) => (
+                    <p key={i} className="mdrawer-teamrow">
+                      {t.teamName}<span> · led by {t.leaderName ?? 'Unassigned'}</span>
+                    </p>
+                  ))
+                )}
+              </section>
+
+              <section className="mdrawer-card">
+                <div className="mdrawer-cardhead">
+                  <h4>Exam history</h4>
+                  {drawerStats && drawerStats.history.length > 0 && (
+                    <span className="mdrawer-count">{drawerStats.history.length}</span>
+                  )}
+                </div>
+                {drawerStats && drawerStats.history.length > 0 ? (
+                  <div className="mdrawer-hist">
+                    {drawerStats.history.map((a) => (
+                      <div className="mdrawer-histrow" key={a.id}>
+                        <div className="hr-main">
+                          <span className="hr-name">{a.exam?.title ?? 'Untitled exam'}</span>
+                          <span className="hr-date">{a.submitted_at ? new Date(a.submitted_at).toLocaleDateString() : ''}</span>
+                        </div>
+                        <div className="hr-right">
+                          <span className="hr-score">{a.score_percent}%</span>
+                          <span className={`badge ${a.passed ? 'passed' : 'failed'}`}>{a.passed ? 'Pass' : 'Fail'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mdrawer-muted">No exams taken yet.</p>
+                )}
+              </section>
+            </>
+          )
+        })()}
+      </aside>
     </div>
   )
 }
