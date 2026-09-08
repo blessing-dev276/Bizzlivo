@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { localDateString } from '../../lib/date'
 import { useAuth } from '../../lib/AuthContext'
 import type {
   FinanceCharge,
   FinanceLedgerEntry,
   FinanceMemberBalances,
   FinanceOrder,
-  IncomeDevelopmentIncomeEntry,
   MemberPayoutAccount,
   WithdrawalRequest,
 } from '../../types/database'
@@ -57,7 +55,6 @@ export default function Wallet() {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([])
   const [ledger, setLedger] = useState<FinanceLedgerEntry[]>([])
   const [accounts, setAccounts] = useState<MemberPayoutAccount[]>([])
-  const [personal, setPersonal] = useState<IncomeDevelopmentIncomeEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,22 +62,19 @@ export default function Wallet() {
   const [filter, setFilter] = useState<TxFilter>('all')
   const [detail, setDetail] = useState<{ order: FinanceOrder; charges: FinanceCharge[] } | null>(null)
   const [showWithdraw, setShowWithdraw] = useState(false)
-  const [showPersonal, setShowPersonal] = useState(false)
 
   const reload = useCallback(async () => {
     if (!orgId || !userId) return
     setLoading(true)
     try {
-      const [b, o, w, l, a, p] = await Promise.all([
+      const [b, o, w, l, a] = await Promise.all([
         loadMemberBalances(orgId, userId),
         listOrders(orgId, { memberId: userId }),
         listWithdrawals(orgId, { memberId: userId }),
         listLedger(orgId, { memberId: userId }),
         listPayoutAccounts(orgId, userId),
-        supabase.from('income_development_income_entries').select('*').eq('org_id', orgId).eq('user_id', userId).order('earned_on', { ascending: false }),
       ])
       setBalances(b); setOrders(o); setWithdrawals(w); setLedger(l); setAccounts(a)
-      setPersonal((p.data as IncomeDevelopmentIncomeEntry[]) ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load your wallet.')
     }
@@ -257,17 +251,6 @@ export default function Wallet() {
           Where approved withdrawals are paid. The account name is confirmed from the number — it can't be typed by hand.
         </p>
         <PayoutAccounts orgId={orgId!} userId={userId!} accounts={accounts} onChange={reload} />
-      </section>
-      )}
-
-      {tab === 'overview' && (
-      <section className="fin-section">
-        <button type="button" className="btn-ghost" onClick={() => setShowPersonal((v) => !v)}>
-          {showPersonal ? '▾' : '▸'} Personal income log
-        </button>
-        {showPersonal && (
-          <PersonalIncome orgId={orgId!} userId={userId!} entries={personal} onChange={reload} canEdit={currentMembership?.role === 'admin'} />
-        )}
       </section>
       )}
 
@@ -549,72 +532,3 @@ function PayoutAccounts({
   )
 }
 
-function PersonalIncome({
-  orgId, userId, entries, onChange, canEdit,
-}: { orgId: string; userId: string; entries: IncomeDevelopmentIncomeEntry[]; onChange: () => void; canEdit: boolean }) {
-  const [amount, setAmount] = useState('')
-  const [source, setSource] = useState('')
-  const [earnedOn, setEarnedOn] = useState(localDateString())
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  async function add(e: FormEvent) {
-    e.preventDefault()
-    const value = Number(amount)
-    if (!(value > 0)) { setErr('Enter an amount greater than zero.'); return }
-    setBusy(true); setErr(null)
-    const { error } = await supabase.from('income_development_income_entries').insert({
-      org_id: orgId, user_id: userId, amount: value, source: source.trim() || null, earned_on: earnedOn,
-    })
-    setBusy(false)
-    if (error) { setErr(error.message); return }
-    setAmount(''); setSource(''); onChange()
-  }
-
-  return (
-    <div style={{ marginTop: 12 }}>
-      <p className="md-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        {canEdit
-          ? <>This is for tracking only. It does <strong>not</strong> affect any withdrawable balance.</>
-          : <>Your office admin records these entries for you. They&apos;re for tracking only and do <strong>not</strong> affect your withdrawable balance.</>}
-      </p>
-      {canEdit && (
-        <form onSubmit={add} className="upload-panel" style={{ marginBottom: 16 }}>
-          <div className="field-row">
-            <label style={{ maxWidth: 160 }}>Amount (₦)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-            <label>Source (optional)<input value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Logo design" /></label>
-            <label style={{ maxWidth: 170 }}>Date<input type="date" value={earnedOn} onChange={(e) => setEarnedOn(e.target.value)} /></label>
-          </div>
-          {err && <p className="form-error">{err}</p>}
-          <button type="submit" disabled={busy || !amount}>{busy ? 'Saving…' : 'Add entry'}</button>
-        </form>
-      )}
-      {entries.length === 0 && !canEdit && <p className="empty-row">No income entries yet.</p>}
-      {entries.length > 0 && (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead><tr><th>Date</th><th>Source</th><th>Amount</th>{canEdit && <th />}</tr></thead>
-            <tbody>
-              {entries.map((e) => (
-                <tr key={e.id}>
-                  <td className="cell-dim">{new Date(e.earned_on).toLocaleDateString()}</td>
-                  <td>{e.source ?? '—'}</td>
-                  <td>{money(Number(e.amount), 'NGN')}</td>
-                  {canEdit && (
-                    <td style={{ textAlign: 'right' }}>
-                      <button type="button" className="btn-ghost" onClick={async () => {
-                        if (!confirm('Delete this entry?')) return
-                        await supabase.from('income_development_income_entries').delete().eq('id', e.id)
-                        onChange()
-                      }}>Delete</button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
