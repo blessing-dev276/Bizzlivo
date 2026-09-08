@@ -594,6 +594,14 @@ label {
   justify-content: space-between;
   gap: 8px;
 }
+.plan-row .badge {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
 .plan-upgrade-btn {
   font-family: var(--font-mono);
   font-size: 11px;
