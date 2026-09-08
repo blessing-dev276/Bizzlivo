@@ -280,6 +280,7 @@ export default function MemberHome() {
   const focus = reqs.find((s) => s.item.is_required && !s.complete && s.status !== 'awaiting_approval') ?? reqs.find((s) => !s.complete)
   const learnDone = cur.learning.filter((s) => s.complete).length
   const taskDone = cur.tasks.filter((s) => s.complete).length
+  const showLearningProgress = cur.rank.order_index > 0
 
   // needs-attention (deduped against visible requirements)
   const attention: { label: string; to: string | (() => void) }[] = []
@@ -458,28 +459,30 @@ export default function MemberHome() {
         </div>
 
         {/* ---- learning progress ---- */}
-        <section className="dash-card col-12">
-          <div className="dash-card-head">
-            <h2>Learning progress</h2>
-            <Link to="/training" className="dash-see-all">Open Learning Center →</Link>
-          </div>
-          {path.learningByArea.length === 0 ? (
-            <p className="md-muted">Nothing published for your rank yet.</p>
-          ) : (
-            <div className="mrk-learn-grid">
-              {path.learningByArea.map((a) => {
-                const pct = a.total > 0 ? Math.round((a.done / a.total) * 100) : 0
-                return (
-                  <Link to={`/training?area=${a.area}`} className="mrk-learn" key={a.area}>
-                    <span className="mrk-learn-name">{a.label}</span>
-                    <span className="mrk-learn-count">{a.done} / {a.total}</span>
-                    <span className="mrk-learn-bar"><i style={{ width: `${pct}%` }} /></span>
-                  </Link>
-                )
-              })}
+        {showLearningProgress && (
+          <section className="dash-card col-12">
+            <div className="dash-card-head">
+              <h2>Learning progress</h2>
+              <Link to="/training" className="dash-see-all">Open Learning Center →</Link>
             </div>
-          )}
-        </section>
+            {path.learningByArea.length === 0 ? (
+              <p className="md-muted">Nothing published for your rank yet.</p>
+            ) : (
+              <div className="mrk-learn-grid">
+                {path.learningByArea.map((a) => {
+                  const pct = a.total > 0 ? Math.round((a.done / a.total) * 100) : 0
+                  return (
+                    <Link to={`/training?area=${a.area}`} className="mrk-learn" key={a.area}>
+                      <span className="mrk-learn-name">{a.label}</span>
+                      <span className="mrk-learn-count">{a.done} / {a.total}</span>
+                      <span className="mrk-learn-bar"><i style={{ width: `${pct}%` }} /></span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ---- upcoming ---- */}
         {upcoming.length > 0 && (
