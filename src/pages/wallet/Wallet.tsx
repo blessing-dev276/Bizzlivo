@@ -426,15 +426,21 @@ function PayoutAccounts({
     e.preventDefault()
     if (!canSave) return
     setBusy(true)
+    setResolveError(null)
     const num = accountNumber.trim()
-    await supabase.from('member_payout_accounts').insert({
+    const { error } = await supabase.from('member_payout_accounts').insert({
       org_id: orgId, user_id: userId, bank_name: bankName.trim(), account_name: accountName.trim(),
       account_number: num, bank_code: bankCode || null,
       masked_account_number: '••••' + num.slice(-4),
       provider: 'paystack', status: 'verified', verified_at: new Date().toISOString(),
       is_default: accounts.length === 0,
     })
-    setBusy(false); setAdding(false); resetForm()
+    setBusy(false)
+    if (error) {
+      setResolveError(`Could not save the account: ${error.message}`)
+      return
+    }
+    setAdding(false); resetForm()
     onChange()
   }
 
