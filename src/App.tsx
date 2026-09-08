@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext'
 import { getOfficeSlugFromHost, officeSubdomainOrigin, officeSubdomainsEnabled } from './lib/tenant'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
-import AppSkeleton, { PageSkeleton } from './components/AppSkeleton'
+import AppSkeleton, { PageSkeleton, type SkeletonVariant } from './components/AppSkeleton'
 import { useOrgUsage } from './lib/plans'
 import { needsPlanSelection } from './lib/entitlements'
 
@@ -107,11 +107,11 @@ function PlanGate({ children }: { children: ReactNode }) {
   )
 }
 
-function Protected({ children }: { children: ReactNode }) {
+function Protected({ children, skeleton = 'cards' }: { children: ReactNode; skeleton?: SkeletonVariant }) {
   return (
     <ProtectedRoute>
       <Layout>
-        <Suspense fallback={<PageSkeleton />}>
+        <Suspense fallback={<PageSkeleton variant={skeleton} />}>
           <PlanGate>{children}</PlanGate>
         </Suspense>
       </Layout>
@@ -234,16 +234,16 @@ export default function App() {
           <Route path="/take/:token" element={<PublicTakeExam />} />
 
           <Route path="/" element={hostSlug ? <OfficeAwareRoot slug={hostSlug} /> : <RootGate />} />
-          <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
+          <Route path="/onboarding" element={<Protected skeleton="form"><Onboarding /></Protected>} />
 
-          <Route path="/quizzes" element={<Protected><Exams /></Protected>} />
-          <Route path="/quizzes/:examId" element={<Protected><ExamDetail /></Protected>} />
-          <Route path="/quizzes/:examId/generate" element={<Protected><GenerateQuestions /></Protected>} />
-          <Route path="/quizzes/:examId/review" element={<Protected><ReviewQuestions /></Protected>} />
-          <Route path="/quizzes/:examId/settings" element={<Protected><ExamSettingsPage /></Protected>} />
-          <Route path="/quizzes/:examId/analytics" element={<Protected><ExamAnalytics /></Protected>} />
-          <Route path="/quizzes/:examId/analytics/:attemptId" element={<Protected><AttemptDetail /></Protected>} />
-          <Route path="/quizzes/:examId/roster" element={<Protected><ExamRoster /></Protected>} />
+          <Route path="/quizzes" element={<Protected skeleton="list"><Exams /></Protected>} />
+          <Route path="/quizzes/:examId" element={<Protected skeleton="detail"><ExamDetail /></Protected>} />
+          <Route path="/quizzes/:examId/generate" element={<Protected skeleton="form"><GenerateQuestions /></Protected>} />
+          <Route path="/quizzes/:examId/review" element={<Protected skeleton="form"><ReviewQuestions /></Protected>} />
+          <Route path="/quizzes/:examId/settings" element={<Protected skeleton="form"><ExamSettingsPage /></Protected>} />
+          <Route path="/quizzes/:examId/analytics" element={<Protected skeleton="table"><ExamAnalytics /></Protected>} />
+          <Route path="/quizzes/:examId/analytics/:attemptId" element={<Protected skeleton="detail"><AttemptDetail /></Protected>} />
+          <Route path="/quizzes/:examId/roster" element={<Protected skeleton="detail"><ExamRoster /></Protected>} />
 
           {/* Billing lives under Settings — keep old paths working. */}
           <Route path="/billing" element={<Navigate to="/settings/billing" replace />} />
@@ -257,49 +257,49 @@ export default function App() {
           <Route path="/settings/billing" element={<Protected><Settings section="billing" /></Protected>} />
           <Route path="/help" element={<Protected><HelpCenter /></Protected>} />
 
-          <Route path="/reports" element={<Protected><ReportsInsights /></Protected>} />
+          <Route path="/reports" element={<Protected skeleton="table"><ReportsInsights /></Protected>} />
           <Route path="/reports/training" element={<Navigate to="/reports?view=learning" replace />} />
-          <Route path="/training" element={<Protected><Training /></Protected>} />
-          <Route path="/training/classes/:classId" element={<Protected><ClassDetail /></Protected>} />
+          <Route path="/training" element={<Protected skeleton="list"><Training /></Protected>} />
+          <Route path="/training/classes/:classId" element={<Protected skeleton="detail"><ClassDetail /></Protected>} />
 
-          <Route path="/business-path" element={<Protected><BusinessPathHub /></Protected>} />
-          <Route path="/business-path/ranks/:rankId" element={<Protected><RankPathBuilder /></Protected>} />
+          <Route path="/business-path" element={<Protected skeleton="list"><BusinessPathHub /></Protected>} />
+          <Route path="/business-path/ranks/:rankId" element={<Protected skeleton="form"><RankPathBuilder /></Protected>} />
           {/* legacy routes kept as redirects so bookmarks/links don't break */}
           <Route path="/tasks" element={<Navigate to="/business-path" replace />} />
           <Route path="/rank" element={<Navigate to="/business-path" replace />} />
-          <Route path="/goals" element={<Protected><MonthlyGoals /></Protected>} />
-          <Route path="/goals/review" element={<Protected><GoalsReview /></Protected>} />
+          <Route path="/goals" element={<Protected skeleton="list"><MonthlyGoals /></Protected>} />
+          <Route path="/goals/review" element={<Protected skeleton="list"><GoalsReview /></Protected>} />
           <Route path="/notifications" element={<Protected><NotificationCenter /></Protected>} />
-          <Route path="/updates" element={<Protected><OfficeUpdates /></Protected>} />
-          <Route path="/office/announcements" element={<Protected><AnnouncementsAdmin /></Protected>} />
-          <Route path="/members/:userId" element={<Protected><MemberProfile360 /></Protected>} />
-          <Route path="/wallet" element={<Protected><Wallet /></Protected>} />
-          <Route path="/finance" element={<Protected><FinanceWorkspace /></Protected>} />
+          <Route path="/updates" element={<Protected skeleton="list"><OfficeUpdates /></Protected>} />
+          <Route path="/office/announcements" element={<Protected skeleton="list"><AnnouncementsAdmin /></Protected>} />
+          <Route path="/members/:userId" element={<Protected skeleton="detail"><MemberProfile360 /></Protected>} />
+          <Route path="/wallet" element={<Protected skeleton="split"><Wallet /></Protected>} />
+          <Route path="/finance" element={<Protected skeleton="split"><FinanceWorkspace /></Protected>} />
 
-          <Route path="/team" element={<Protected><TeamPerformance /></Protected>} />
-          <Route path="/team/:teamId" element={<Protected><TeamDetail /></Protected>} />
+          <Route path="/team" element={<Protected skeleton="table"><TeamPerformance /></Protected>} />
+          <Route path="/team/:teamId" element={<Protected skeleton="detail"><TeamDetail /></Protected>} />
           <Route path="/my-team" element={<Protected><MyTeam /></Protected>} />
 
-          <Route path="/events" element={<Protected><Events /></Protected>} />
-          <Route path="/events/new" element={<Protected><EventForm /></Protected>} />
-          <Route path="/events/:eventId" element={<Protected><EventDetail /></Protected>} />
-          <Route path="/events/:eventId/edit" element={<Protected><EventForm /></Protected>} />
-          <Route path="/events/:eventId/:date" element={<Protected><OccurrenceDetail /></Protected>} />
+          <Route path="/events" element={<Protected skeleton="list"><Events /></Protected>} />
+          <Route path="/events/new" element={<Protected skeleton="form"><EventForm /></Protected>} />
+          <Route path="/events/:eventId" element={<Protected skeleton="detail"><EventDetail /></Protected>} />
+          <Route path="/events/:eventId/edit" element={<Protected skeleton="form"><EventForm /></Protected>} />
+          <Route path="/events/:eventId/:date" element={<Protected skeleton="detail"><OccurrenceDetail /></Protected>} />
 
-          <Route path="/leaderboard" element={<Protected><Leaderboard /></Protected>} />
+          <Route path="/leaderboard" element={<Protected skeleton="list"><Leaderboard /></Protected>} />
 
-          <Route path="/invites" element={<Protected><Invites /></Protected>} />
+          <Route path="/invites" element={<Protected skeleton="list"><Invites /></Protected>} />
           <Route path="/invites/assign" element={<Protected><Assign /></Protected>} />
 
-          <Route path="/assignments" element={<Protected><Assignments /></Protected>} />
-          <Route path="/assignments/new" element={<Protected><NewAssignment /></Protected>} />
-          <Route path="/assignments/:assignmentId" element={<Protected><AssignmentDetail /></Protected>} />
-          <Route path="/my-assignments" element={<Protected><MyAssignments /></Protected>} />
-          <Route path="/my-assignments/:assignmentId" element={<Protected><SubmitAssignment /></Protected>} />
+          <Route path="/assignments" element={<Protected skeleton="list"><Assignments /></Protected>} />
+          <Route path="/assignments/new" element={<Protected skeleton="form"><NewAssignment /></Protected>} />
+          <Route path="/assignments/:assignmentId" element={<Protected skeleton="detail"><AssignmentDetail /></Protected>} />
+          <Route path="/my-assignments" element={<Protected skeleton="list"><MyAssignments /></Protected>} />
+          <Route path="/my-assignments/:assignmentId" element={<Protected skeleton="form"><SubmitAssignment /></Protected>} />
 
-          <Route path="/my-quizzes" element={<Protected><MyExams /></Protected>} />
-          <Route path="/my-quizzes/:assignmentId/take" element={<Protected><TakeExam /></Protected>} />
-          <Route path="/my-quizzes/attempts/:attemptId/result" element={<Protected><Result /></Protected>} />
+          <Route path="/my-quizzes" element={<Protected skeleton="list"><MyExams /></Protected>} />
+          <Route path="/my-quizzes/:assignmentId/take" element={<Protected skeleton="detail"><TakeExam /></Protected>} />
+          <Route path="/my-quizzes/attempts/:attemptId/result" element={<Protected skeleton="detail"><Result /></Protected>} />
 
           {/* legacy — Exams → Quizzes, Team Performance → Team */}
           <Route path="/exams/*" element={<LegacyRedirect from="/exams" to="/quizzes" />} />

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 type Theme = 'dark' | 'light'
 
@@ -25,23 +25,38 @@ function readInitialTheme(): Theme {
   return stored === 'light' ? 'light' : 'dark'
 }
 
+function applyThemeDom(theme: Theme) {
+  document.documentElement.setAttribute('data-theme', theme)
+  try { localStorage.setItem(THEME_KEY, theme) } catch { /* ignore */ }
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', THEME_BG[theme])
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readInitialTheme)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem(THEME_KEY, theme)
-    // Keep the browser/OS chrome (mobile status bar, desktop title bar,
-    // PWA surfaces) in sync with the active theme.
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', THEME_BG[theme])
+    applyThemeDom(theme)
   }, [theme])
 
-  function toggleTheme() {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
-  }
+  const value = useMemo<ThemeContextValue>(() => ({
+    theme,
+    toggleTheme() {
+      const next: Theme = theme === 'dark' ? 'light' : 'dark'
+      const root = document.documentElement
+      // Kill every CSS transition for the duration of the swap so the
+      // whole page recolours in a single paint instead of dozens of
+      // elements each animating their border/background/color.
+      root.classList.add('theme-switching')
+      applyThemeDom(next)          // instant DOM flip, before React re-renders
+      setTheme(next)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => root.classList.remove('theme-switching'))
+      })
+    },
+  }), [theme])
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
