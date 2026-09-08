@@ -188,7 +188,7 @@ function Overview({
   const attnTotal = na
     ? na.awaiting_settlement + na.settled_not_credited + na.withdrawals_awaiting_approval
       + na.withdrawals_awaiting_authorization + na.withdrawals_awaiting_payment
-      + na.withdrawals_awaiting_confirmation + na.withdrawals_failed
+      + na.withdrawals_awaiting_confirmation + na.withdrawals_failed + na.payout_sla_breaches
     : 0
   return (
     <>
@@ -214,6 +214,7 @@ function Overview({
             {na.withdrawals_awaiting_payment > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_payment} authorized — payment to be recorded</button></li>}
             {na.withdrawals_awaiting_confirmation > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_awaiting_confirmation} payment{na.withdrawals_awaiting_confirmation === 1 ? '' : 's'} awaiting confirmation</button></li>}
             {na.withdrawals_failed > 0 && <li><button type="button" onClick={() => onGo('withdrawals')}>{na.withdrawals_failed} failed payout{na.withdrawals_failed === 1 ? '' : 's'} to resolve</button></li>}
+            {na.payout_sla_breaches > 0 && <li><button type="button" onClick={() => onGo('reconciliation')}>{na.payout_sla_breaches} payout{na.payout_sla_breaches === 1 ? '' : 's'} past SLA — review</button></li>}
           </ul>
         )}
       </section>

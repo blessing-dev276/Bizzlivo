@@ -266,6 +266,9 @@ function RulesForm({ cfg, busy, onSubmit }: {
   const [confirm, setConfirm] = useState(cfg.require_payment_confirmation)
   const [separation, setSeparation] = useState(cfg.enforce_separation_of_duties)
   const [memberCancel, setMemberCancel] = useState(cfg.allow_member_cancel)
+  const [extRecon, setExtRecon] = useState(cfg.require_external_reconciliation)
+  const [slaHours, setSlaHours] = useState(String(cfg.payout_sla_hours ?? 24))
+  const [autoRev, setAutoRev] = useState(cfg.auto_reversal_hours != null ? String(cfg.auto_reversal_hours) : '')
 
   return (
     <form
@@ -278,6 +281,9 @@ function RulesForm({ cfg, busy, onSubmit }: {
         require_payment_confirmation: confirm,
         enforce_separation_of_duties: separation,
         allow_member_cancel: memberCancel,
+        require_external_reconciliation: extRecon,
+        payout_sla_hours: Number(slaHours) || 24,
+        auto_reversal_hours: autoRev === '' ? '' : Number(autoRev),
       }) }}
     >
       <div className="field-row">
@@ -298,8 +304,25 @@ function RulesForm({ cfg, busy, onSubmit }: {
         </label>
       )}
       <ToggleRow label="Require a separate person to confirm payment before it counts as PAID" checked={confirm} onChange={setConfirm} />
+      <ToggleRow label="Always reconcile office-operated payments — a different person must confirm every external payment, even if the option above is off" checked={extRecon} onChange={setExtRecon} />
       <ToggleRow label="Enforce separation of duties (different people for approve / authorize / confirm, where possible)" checked={separation} onChange={setSeparation} />
       <ToggleRow label="Let members cancel their own request before review" checked={memberCancel} onChange={setMemberCancel} />
+
+      <div className="field-row" style={{ marginTop: 12 }}>
+        <label>Payout SLA (hours)
+          <input type="number" min="1" max="720" step="1" value={slaHours} onChange={(e) => setSlaHours(e.target.value)} />
+        </label>
+        <label>Auto-reversal window (hours, blank = off)
+          <input type="number" min="1" max="720" step="1" value={autoRev} onChange={(e) => setAutoRev(e.target.value)} />
+        </label>
+      </div>
+      <p className="set-hint" style={{ marginTop: 6 }}>
+        A withdrawal stuck mid-payment past the <strong>SLA</strong> is flagged for the finance team and the member is
+        notified — the amount stays reserved. If an <strong>auto-reversal window</strong> is set, an automated provider
+        transfer that isn't confirmed within it is marked failed and the reservation is returned to the member.
+        External (office-operated) payments are never auto-reversed.
+      </p>
+
       <div style={{ marginTop: 14 }}>
         <button type="submit" disabled={busy}>Save rules</button>
       </div>

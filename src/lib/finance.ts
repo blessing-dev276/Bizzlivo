@@ -56,7 +56,16 @@ export const WITHDRAWAL_MEMBER_LABEL: Record<WithdrawalMemberStatus, string> = {
   returned: 'Returned',
 }
 
-export function withdrawalMemberStatus(s: WithdrawalStatus): WithdrawalMemberStatus {
+/** True when a `failed` withdrawal is an auto-reversal (timeout) — funds already returned. */
+export function isAutoReversed(w: { status: WithdrawalStatus; failure_reason: string | null }): boolean {
+  return w.status === 'failed' && (w.failure_reason ?? '').startsWith('Auto-reversal')
+}
+
+export function withdrawalMemberStatus(
+  s: WithdrawalStatus,
+  opts?: { autoReversed?: boolean },
+): WithdrawalMemberStatus {
+  if (s === 'failed' && opts?.autoReversed) return 'returned'
   switch (s) {
     case 'requested':
     case 'under_review':
@@ -158,6 +167,7 @@ export interface FinanceOrgOverview {
     withdrawals_awaiting_payment: number
     withdrawals_awaiting_confirmation: number
     withdrawals_failed: number
+    payout_sla_breaches: number
   }
 }
 

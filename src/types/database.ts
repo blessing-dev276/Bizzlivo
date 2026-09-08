@@ -1197,6 +1197,9 @@ export interface OrgFinanceConfig {
   require_payment_confirmation: boolean
   enforce_separation_of_duties: boolean
   allow_member_cancel: boolean
+  payout_sla_hours: number
+  require_external_reconciliation: boolean
+  auto_reversal_hours: number | null
   updated_at: string
   connection: OrgFinanceConnection | null
   automation_available: boolean

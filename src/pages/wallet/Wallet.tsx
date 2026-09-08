@@ -25,6 +25,7 @@ import {
   requestWithdrawal,
   cancelWithdrawal,
   withdrawalMemberStatus,
+  isAutoReversed,
   WITHDRAWAL_MEMBER_LABEL,
   type NigerianBank,
 } from '../../lib/finance'
@@ -174,7 +175,7 @@ export default function Wallet() {
               <thead><tr><th>Request #</th><th>Amount</th><th>Status</th><th>Requested</th><th /></tr></thead>
               <tbody>
                 {withdrawals.map((w) => {
-                  const ms = withdrawalMemberStatus(w.status)
+                  const ms = withdrawalMemberStatus(w.status, { autoReversed: isAutoReversed(w) })
                   return (
                   <tr key={w.id}>
                     <td>{w.reference}</td>
