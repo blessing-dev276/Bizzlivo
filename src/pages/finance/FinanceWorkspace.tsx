@@ -126,7 +126,14 @@ export default function FinanceWorkspace() {
         ))}
       </div>
 
-      {loading || !cfg ? <p className="empty-row">Loading…</p> : (
+      {loading ? <p className="empty-row">Loading…</p> : !cfg ? (
+        <div className="empty-row">
+          <p>Finance isn't available yet. {error ?? 'Please try again.'}</p>
+          <p className="md-muted" style={{ fontSize: 12 }}>
+            If this persists, the Finance database migrations (0072/0073) may not be applied to this environment.
+          </p>
+        </div>
+      ) : (
         <>
           {tab === 'overview' && <Overview orgId={orgId} orders={orders} withdrawals={withdrawals} onGo={setTab} />}
           {tab === 'orders' && (

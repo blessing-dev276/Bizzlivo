@@ -169,10 +169,11 @@ alter table withdrawal_requests
   add column failure_reason       text,
   add column active_payment_id    uuid references withdrawal_payments(id);
 
--- map the old lean state set onto the new one before swapping the check
+-- Drop the old CHECK first, then remap the lean state set onto the new
+-- one, then add the wider CHECK. (Remapping before the drop would fail
+-- the old constraint on any 'processing' row.)
+alter table withdrawal_requests drop constraint if exists withdrawal_requests_status_check;
 update withdrawal_requests set status = 'authorized_for_payment' where status = 'processing';
-
-alter table withdrawal_requests drop constraint withdrawal_requests_status_check;
 alter table withdrawal_requests add constraint withdrawal_requests_status_check
   check (status in (
     'requested','under_review','approved','authorized_for_payment',
@@ -181,7 +182,7 @@ alter table withdrawal_requests add constraint withdrawal_requests_status_check
 -- ------------------------------------------------------------
 -- 6. finance_ledger — new entry types (payout_debit / adjustments / reversal)
 -- ------------------------------------------------------------
-alter table finance_ledger drop constraint finance_ledger_entry_type_check;
+alter table finance_ledger drop constraint if exists finance_ledger_entry_type_check;
 alter table finance_ledger add constraint finance_ledger_entry_type_check
   check (entry_type in (
     'order_recorded','settlement','conversion','charge','charge_reversal',

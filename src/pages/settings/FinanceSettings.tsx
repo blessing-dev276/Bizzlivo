@@ -53,7 +53,19 @@ export default function FinanceSettings() {
   }
 
   if (!orgId) return null
-  if (!cfg) return <div><div className="page-head"><h1>Finance</h1></div><p className="empty-row">{err ?? 'Loading…'}</p></div>
+  if (!cfg) return (
+    <div>
+      <div className="page-head"><h1>Finance</h1></div>
+      {err ? (
+        <div className="empty-row">
+          <p className="form-error" style={{ marginBottom: 6 }}>{err}</p>
+          <p className="md-muted" style={{ fontSize: 12 }}>
+            If this mentions a missing function, the Finance migrations (0072/0073) are not yet applied to this environment.
+          </p>
+        </div>
+      ) : <p className="empty-row">Loading…</p>}
+    </div>
+  )
 
   const conn = cfg.connection
   const connected = conn?.status === 'active'

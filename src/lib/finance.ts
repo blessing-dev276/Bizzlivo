@@ -137,7 +137,7 @@ const EMPTY_BALANCES: FinanceMemberBalances = {
 
 export async function loadMemberBalances(orgId: string, memberId: string): Promise<FinanceMemberBalances> {
   const { data, error } = await supabase.rpc('finance_member_balances', { p_org: orgId, p_member: memberId })
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return (data as FinanceMemberBalances) ?? EMPTY_BALANCES
 }
 
@@ -163,25 +163,25 @@ export interface FinanceOrgOverview {
 
 export async function loadOrgOverview(orgId: string, startIso: string, endIso: string): Promise<FinanceOrgOverview> {
   const { data, error } = await supabase.rpc('finance_org_overview', { p_org: orgId, p_start: startIso, p_end: endIso })
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return data as FinanceOrgOverview
 }
 
 export async function loadFinanceConfig(orgId: string): Promise<OrgFinanceConfig> {
   const { data, error } = await supabase.rpc('finance_config_view', { p_org: orgId })
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return data as OrgFinanceConfig
 }
 
 export async function loadFinanceGrants(orgId: string): Promise<OrgFinanceGrant[]> {
   const { data, error } = await supabase.rpc('finance_grants_list', { p_org: orgId })
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return (data as OrgFinanceGrant[]) ?? []
 }
 
 export async function loadReconciliation(orgId: string): Promise<FinanceReconciliation> {
   const { data, error } = await supabase.rpc('finance_reconciliation', { p_org: orgId })
-  if (error) throw error
+  if (error) throw new Error(error.message)
   return data as FinanceReconciliation
 }
 
