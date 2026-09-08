@@ -72,6 +72,8 @@ export default function FinanceSettings() {
       {err && <p className="form-error">{err}</p>}
       {ok && <p className="md-muted">{ok}</p>}
 
+      <div className="set-sections">
+
       {/* ---- Finance Account ---- */}
       <section className="set-card">
         <div className="set-card-head"><h2>Finance Account</h2>
@@ -101,6 +103,7 @@ export default function FinanceSettings() {
           </div>
         )}
         <SettlementForm
+          key={cfg.updated_at + ':conn'}
           conn={conn}
           busy={busy}
           onSubmit={(patch) => run(() => updateFinanceConnection(orgId, { ...patch, status: 'active' }), 'Finance account updated.')}
@@ -124,7 +127,7 @@ export default function FinanceSettings() {
       {/* ---- Withdrawal Rules ---- */}
       <section className="set-card">
         <div className="set-card-head"><h2>Withdrawal Rules</h2><p>Limits and approval policy. Every change is audited.</p></div>
-        <RulesForm cfg={cfg} busy={busy} onSubmit={(patch) => run(() => updateFinanceConfig(orgId, patch), 'Rules updated.')} />
+        <RulesForm key={cfg.updated_at + ':rules'} cfg={cfg} busy={busy} onSubmit={(patch) => run(() => updateFinanceConfig(orgId, patch), 'Rules updated.')} />
       </section>
 
       {/* ---- Currency ---- */}
@@ -133,7 +136,7 @@ export default function FinanceSettings() {
         <div className="set-field-col" style={{ maxWidth: 220 }}>
           <label>Base currency
             <select
-              defaultValue={cfg.base_currency}
+              value={cfg.base_currency}
               disabled={busy}
               onChange={(e) => run(() => updateFinanceConfig(orgId, { base_currency: e.target.value }), 'Base currency updated.')}
             >
@@ -173,7 +176,7 @@ export default function FinanceSettings() {
         <div className="set-field-col" style={{ maxWidth: 320 }}>
           <label>Status
             <select
-              defaultValue={cfg.finance_status}
+              value={cfg.finance_status}
               disabled={busy}
               onChange={(e) => run(() => updateFinanceConfig(orgId, { finance_status: e.target.value }), 'Finance status updated.')}
             >
@@ -190,15 +193,17 @@ export default function FinanceSettings() {
           />
         </div>
       </section>
+
+      </div>
     </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="set-field">
-      <span className="set-field-label">{label}</span>
-      <span className="set-field-value">{children}</span>
+    <div className="set-field-col">
+      <span className="set-hint" style={{ marginTop: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-h)' }}>{children}</span>
     </div>
   )
 }
@@ -329,6 +334,7 @@ function GrantsEditor({ grants, members, busy, onSet, onRevoke }: {
           </div>
           <label style={{ display: 'block', maxWidth: 240, marginTop: 8, fontSize: 13 }}>Approval limit (blank = unlimited)
             <input
+              key={String(g.approval_limit_amount ?? 'none')}
               type="number" min="0" step="0.01"
               defaultValue={g.approval_limit_amount ?? ''}
               disabled={busy}
